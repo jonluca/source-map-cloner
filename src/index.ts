@@ -2,38 +2,45 @@ import axios from "axios";
 import jsdom from "jsdom";
 import * as path from "path";
 import * as fs from "fs";
-const { JSDOM } = jsdom;
 import sourceMap from "source-map";
-const { SourceMapConsumer } = sourceMap;
-import { fileURLToPath } from "url";
-import { dirname } from "path";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const { JSDOM } = jsdom;
+const { SourceMapConsumer } = sourceMap;
 
 const BASE_URL = process.argv[process.argv.length - 2];
 const OUT_DIR = process.argv[process.argv.length - 1];
 const CWD = process.cwd();
 const parseSourceMap = async (sourceMap, guessedUrl: string) => {
-  const parsed = await new SourceMapConsumer(sourceMap);
-  const url = new URL(guessedUrl);
-  const pathname = url.pathname;
-  parsed.sources.forEach(function (value, index) {
-    const joined = path.join(CWD, OUT_DIR, pathname, value);
-    const pathParsed = path.parse(joined);
+  try {
+    const parsed = await new SourceMapConsumer(sourceMap);
+    const url = new URL(guessedUrl);
+    const pathname = url.pathname;
+    const dirname = path.parse(pathname).dir;
+    parsed.sources.forEach(function (value, index) {
+      const joined = path.join(
+        CWD,
+        OUT_DIR,
+        value.startsWith("/") ? pathname : dirname,
+        value
+      );
+      const pathParsed = path.parse(joined);
 
-    if (!pathParsed.dir.startsWith(CWD)) {
-      console.warn("Warning, saved output escapes directory");
-    }
-    if (pathParsed.dir) {
-      fs.mkdirSync(pathParsed.dir, { recursive: true });
-    }
-    fs.writeFile(
-      joined,
-      parsed.sourcesContent[index] || "",
-      (path) => path && console.log(value, path)
-    );
-  });
+      if (!pathParsed.dir.startsWith(CWD)) {
+        console.warn("Warning, saved output escapes directory");
+      }
+      if (pathParsed.dir) {
+        fs.mkdirSync(pathParsed.dir, { recursive: true });
+      }
+      fs.writeFile(
+        joined,
+        parsed.sourcesContent[index] || "",
+        (path) => path && console.log(value, path)
+      );
+    });
+  } catch (e) {
+    console.error(`Error parsing source map for ${guessedUrl}`);
+    console.error(e);
+  }
 };
 
 const fetchAndParseJsFile = async (url: string) => {
@@ -58,7 +65,29 @@ const fetchAndParseJsFile = async (url: string) => {
   }
 
   if (headers["X-SourceMap"]) {
-    // parse from there
+    // parse from there. todo in the future
+  }
+  const urlToFetch = data.split("//# sourceMappingURL=")[1];
+  if (urlToFetch) {
+    // todo - fetch the url and do the above
+    const baseUrl = new URL(url);
+    const pathname = baseUrl.pathname;
+    const dirname = path.parse(pathname).dir;
+
+    let fullUrl;
+    if (urlToFetch.startsWith("http")) {
+      fullUrl = urlToFetch;
+    } else {
+      const baseJoin = urlToFetch.startsWith("/") ? pathname : dirname;
+      baseUrl.pathname = path.join(baseJoin, urlToFetch);
+      fullUrl = baseUrl.toString();
+    }
+
+    const { data: sourceMap } = await axios.get(fullUrl);
+    if (sourceMap) {
+      await parseSourceMap(sourceMap, guessedUrl);
+      return;
+    }
   }
 };
 
@@ -84,9 +113,14 @@ const run = async () => {
   });
 
   for (const s of src) {
-    const parsedUrl = new URL(BASE_URL);
-    parsedUrl.pathname = s;
-    await fetchAndParseJsFile(parsedUrl.toString());
+    try {
+      const parsedUrl = new URL(BASE_URL);
+      parsedUrl.pathname = s;
+      await fetchAndParseJsFile(parsedUrl.toString());
+    } catch (e) {
+      console.error(`Error parsing source ${s}`);
+      console.error(e);
+    }
   }
 };
 run();
