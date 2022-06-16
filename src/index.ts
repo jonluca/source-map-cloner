@@ -31,10 +31,13 @@ const parseSourceMap = async (sourceMap, guessedUrl: string) => {
       if (pathParsed.dir) {
         fs.mkdirSync(pathParsed.dir, { recursive: true });
       }
+      if (fs.existsSync(joined)) {
+        console.warn(`${joined} path exists, overwriting`);
+      }
       fs.writeFile(
         joined,
         parsed.sourcesContent[index] || "",
-        (path) => path && console.log(value, path)
+        (err) => err && console.log(value, err)
       );
     });
   } catch (e) {

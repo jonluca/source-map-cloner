@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "t-node": "node --experimental-specifier-resolution=node --no-warnings --loader ts-node/esm",
-    "run": "yarn t-node src/index.ts"
+    "fetch-source": "yarn t-node src/index.ts"
   },
   "dependencies": {
     "@types/eslint": "8.4.3",

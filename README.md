@@ -5,5 +5,5 @@ This fetches the source maps from a website and creates the file structure local
 ## Usage
 
 ```bash
-yarn run <your_url> <directory_to_create>
+yarn fetch-source <your_url> <directory_to_create>
 ```
