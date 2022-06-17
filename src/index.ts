@@ -54,10 +54,15 @@ const parseSourceMap = async (sourceMap, guessedUrl: string) => {
 const fetchAndParseJsFile = async (url: string) => {
   const { data } = await axios.get(url);
   const { sourceMappingURL } = getSourceMappingURL(data);
-  const { sourceContent } = await fetchFromURL(sourceMappingURL, url);
-  if (sourceContent) {
-    await parseSourceMap(sourceContent, url);
-    return;
+  if (sourceMappingURL) {
+    console.log(`Found source map url: ${sourceMappingURL}`);
+    const { sourceContent } = await fetchFromURL(sourceMappingURL, url);
+    if (sourceContent) {
+      console.log(`Found source map content: ${sourceMappingURL}`);
+      await parseSourceMap(sourceContent, url);
+      return;
+    }
+    console.log(`No source map content for: ${sourceMappingURL}`);
   }
 };
 
@@ -82,6 +87,11 @@ const run = async () => {
     }
   });
 
+  if (!src.length) {
+    console.log("No sources found, bailing");
+    process.exit(0);
+  }
+
   for (const s of src) {
     try {
       const parsedUrl = new URL(BASE_URL);
@@ -92,5 +102,6 @@ const run = async () => {
       console.error(e);
     }
   }
+  console.error(`Done`);
 };
 run();
