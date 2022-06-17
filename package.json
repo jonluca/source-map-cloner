@@ -13,9 +13,11 @@
     "axios": "^0.27.2",
     "concurrently": "^7.2.2",
     "husky": "^8.0.1",
+    "iconv-lite": "^0.6.3",
     "jsdom": "^19.0.0",
     "skip-postinstall": "^1.0.0",
     "source-map": "^0.7.4",
+    "source-map-js": "^1.0.2",
     "ts-node": "10.8.1",
     "typescript": "4.7.3"
   },

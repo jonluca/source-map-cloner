@@ -2,7 +2,8 @@ import axios from "axios";
 import jsdom from "jsdom";
 import * as path from "path";
 import * as fs from "fs";
-import sourceMap from "source-map";
+import sourceMap from "source-map-js";
+import { fetchFromURL, getSourceMappingURL } from "./utils";
 
 const { JSDOM } = jsdom;
 const { SourceMapConsumer } = sourceMap;
@@ -12,10 +13,13 @@ const OUT_DIR = process.argv[process.argv.length - 1];
 const CWD = process.cwd();
 const parseSourceMap = async (sourceMap, guessedUrl: string) => {
   try {
-    const parsed = await new SourceMapConsumer(sourceMap);
+    const parsed = await new SourceMapConsumer(
+      typeof sourceMap === "string" ? JSON.parse(sourceMap) : sourceMap
+    );
     const url = new URL(guessedUrl);
     const pathname = url.pathname;
     const dirname = path.parse(pathname).dir;
+    // @ts-ignore
     parsed.sources.forEach(function (value, index) {
       const joined = path.join(
         CWD,
@@ -36,6 +40,7 @@ const parseSourceMap = async (sourceMap, guessedUrl: string) => {
       }
       fs.writeFile(
         joined,
+        // @ts-ignore
         parsed.sourcesContent[index] || "",
         (err) => err && console.log(value, err)
       );
@@ -47,50 +52,12 @@ const parseSourceMap = async (sourceMap, guessedUrl: string) => {
 };
 
 const fetchAndParseJsFile = async (url: string) => {
-  // start by fetching the maps directly - if this works, we're golden
-  const guessedUrl = url.replace(/\.js$/, ".js.map");
-  const { data: sourceMap } = await axios.get(guessedUrl);
-  if (sourceMap) {
-    await parseSourceMap(sourceMap, guessedUrl);
+  const { data } = await axios.get(url);
+  const { sourceMappingURL } = getSourceMappingURL(data);
+  const { sourceContent } = await fetchFromURL(sourceMappingURL, url);
+  if (sourceContent) {
+    await parseSourceMap(sourceContent, url);
     return;
-  }
-
-  // if we don't have it, try and parse it from the page
-  const { headers, data } = await axios.get(url);
-  const b64 = data.split(
-    "//# sourceMappingURL=data:application/json;base64,"
-  )[1];
-  // if we have base64 data, then parse it that way
-  if (b64) {
-    const rawSourceMap = Buffer.from(b64, "base64").toString();
-    await parseSourceMap(rawSourceMap, url);
-    return;
-  }
-
-  if (headers["X-SourceMap"]) {
-    // parse from there. todo in the future
-  }
-  const urlToFetch = data.split("//# sourceMappingURL=")[1];
-  if (urlToFetch) {
-    // todo - fetch the url and do the above
-    const baseUrl = new URL(url);
-    const pathname = baseUrl.pathname;
-    const dirname = path.parse(pathname).dir;
-
-    let fullUrl;
-    if (urlToFetch.startsWith("http")) {
-      fullUrl = urlToFetch;
-    } else {
-      const baseJoin = urlToFetch.startsWith("/") ? pathname : dirname;
-      baseUrl.pathname = path.join(baseJoin, urlToFetch);
-      fullUrl = baseUrl.toString();
-    }
-
-    const { data: sourceMap } = await axios.get(fullUrl);
-    if (sourceMap) {
-      await parseSourceMap(sourceMap, guessedUrl);
-      return;
-    }
   }
 };
 
