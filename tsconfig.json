@@ -19,7 +19,8 @@
     "baseUrl": ".",
     "incremental": true,
     "downlevelIteration": true,
-    "checkJs": false
+    "checkJs": false,
+    "typeRoots": ["node_modules/@types", "src/types"],
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "src/types/*.d.ts"]
 }
