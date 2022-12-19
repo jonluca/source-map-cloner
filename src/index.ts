@@ -5,12 +5,21 @@ import type { RawSourceMap } from "source-map-js";
 import sourceMap from "source-map-js";
 import { fetchFromURL, getSourceMappingURL } from "./utils";
 import { axiosClient } from "./axiosClient";
-
 const { JSDOM } = jsdom;
 const { SourceMapConsumer } = sourceMap;
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 
-const BASE_URL = process.argv[process.argv.length - 2];
-const OUT_DIR = process.argv[process.argv.length - 1];
+const args = yargs(hideBin(process.argv))
+  .options({
+    url: { type: "string", alias: "u" },
+    dir: { type: "string", demandOption: true, alias: "d" },
+  })
+  .parseSync();
+
+const BASE_URL = args.url;
+const OUT_DIR = args.dir;
+
 const CWD = process.cwd();
 const parseSourceMap = async (sourceMap, guessedUrl: string) => {
   try {
@@ -20,16 +29,19 @@ const parseSourceMap = async (sourceMap, guessedUrl: string) => {
     const url = new URL(guessedUrl);
     const pathname = url.pathname;
     const dirname = path.parse(pathname).dir;
+    const DIR_TO_SAVE = path.join(CWD, OUT_DIR);
     parsed.sources.forEach(function (value, index) {
-      const joined = path.join(
-        CWD,
-        OUT_DIR,
-        value.startsWith("/") ? pathname : dirname,
-        value
-      );
+      const paths = value.startsWith("/") ? pathname : dirname;
+      const numDirs = paths.split("/").length - 1;
+      const numPathsUp = value.split("../").length - 1;
+      if (numPathsUp > numDirs) {
+        const numDots = "../".repeat(numDirs);
+        value = numDots + value.split("../").pop();
+      }
+      const joined = path.join(DIR_TO_SAVE, paths, value);
       const pathParsed = path.parse(joined);
 
-      if (!pathParsed.dir.startsWith(CWD)) {
+      if (!pathParsed.dir.startsWith(DIR_TO_SAVE)) {
         console.warn("Warning, saved output escapes directory");
       }
       if (pathParsed.dir) {
