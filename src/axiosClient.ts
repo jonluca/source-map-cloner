@@ -1,6 +1,6 @@
 import { HttpCookieAgent, HttpsCookieAgent } from "http-cookie-agent/http";
 import { CookieJar } from "tough-cookie";
-import type { AxiosRequestConfig } from "axios";
+import type { InternalAxiosRequestConfig } from "axios";
 import axios from "axios";
 
 export const jar = new CookieJar(undefined, {
@@ -9,8 +9,8 @@ export const jar = new CookieJar(undefined, {
   rejectPublicSuffixes: false,
 });
 export function requestInterceptor(
-  config: AxiosRequestConfig
-): AxiosRequestConfig {
+  config: InternalAxiosRequestConfig
+): InternalAxiosRequestConfig {
   if (!config.jar) {
     return config;
   }
@@ -45,6 +45,24 @@ export function requestInterceptor(
   return config;
 }
 
-const client = axios.create({ jar });
+const client = axios.create({
+  jar,
+  headers: {
+    "accept-language": "en",
+    "cache-control": "max-age=0",
+    "sec-ch-ua":
+      '"Chromium";v="110", "Not A(Brand";v="24", "Google Chrome";v="110"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"macOS"',
+    "sec-fetch-dest": "document",
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-site": "same-origin",
+    "sec-fetch-user": "?1",
+    "upgrade-insecure-requests": "1",
+    "user-agent":
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
+  },
+  validateStatus: () => true,
+});
 client.interceptors.request.use(requestInterceptor);
 export const axiosClient = client;

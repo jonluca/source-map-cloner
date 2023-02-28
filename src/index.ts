@@ -10,11 +10,19 @@ const { SourceMapConsumer } = sourceMap;
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import Crawler from "crawler";
+import { mkdirp } from "mkdirp";
 
 const args = yargs(hideBin(process.argv))
   .options({
     url: { type: "string", alias: "u", demandOption: true },
     dir: { type: "string", demandOption: true, alias: "d" },
+    urlPathBasedSaving: {
+      type: "boolean",
+      demandOption: false,
+      alias: "p",
+      description:
+        "Include the path in the url in the directory structure (warning, might create duplicate files)",
+    },
     crawl: { type: "boolean", alias: "c", default: false },
     verbose: { type: "boolean", alias: "v", default: false },
   })
@@ -24,7 +32,11 @@ const BASE_URL = args.url;
 const OUT_DIR = args.dir;
 
 const CWD = process.cwd();
-const parseSourceMap = async (sourceMap, guessedUrl: string) => {
+const parseSourceMap = async (
+  sourceMap,
+  guessedUrl: string,
+  urlPathBasedSaving: boolean | undefined
+) => {
   try {
     const parsed = (await new SourceMapConsumer(
       typeof sourceMap === "string" ? JSON.parse(sourceMap) : sourceMap
@@ -34,21 +46,27 @@ const parseSourceMap = async (sourceMap, guessedUrl: string) => {
     const dirname = path.parse(pathname).dir;
     const DIR_TO_SAVE = path.join(CWD, OUT_DIR);
     parsed.sources.forEach(function (value, index) {
-      const paths = value.startsWith("/") ? pathname : dirname;
-      const numDirs = paths.split("/").length - 1;
-      const numPathsUp = value.split("../").length - 1;
-      if (numPathsUp > numDirs) {
-        const numDots = "../".repeat(numDirs);
-        value = numDots + value.split("../").pop();
+      let joined = path.join(DIR_TO_SAVE, value);
+      if (urlPathBasedSaving) {
+        const paths = value.startsWith("/") ? pathname : dirname;
+        const numDirs = paths.split("/").length - 1;
+        const numPathsUp = value.split("../").length - 1;
+        if (numPathsUp > numDirs) {
+          const numDots = "../".repeat(numDirs);
+          value = numDots + value.split("../").pop();
+        }
+        joined = path.join(DIR_TO_SAVE, paths, value);
       }
-      const joined = path.join(DIR_TO_SAVE, paths, value);
+      if (joined.endsWith("/")) {
+        joined = joined.slice(0, -1);
+      }
       const pathParsed = path.parse(joined);
 
       if (args.verbose && !pathParsed.dir.startsWith(DIR_TO_SAVE)) {
         console.warn("Warning, saved output escapes directory");
       }
       if (pathParsed.dir) {
-        fs.mkdirSync(pathParsed.dir, { recursive: true });
+        mkdirp.sync(pathParsed.dir);
       }
       if (args.verbose && fs.existsSync(joined)) {
         console.warn(`${joined} path exists, overwriting`);
@@ -58,7 +76,9 @@ const parseSourceMap = async (sourceMap, guessedUrl: string) => {
         console.warn(`No source code for ${value}`);
       }
       fs.writeFile(joined, sourceCode, (err) => err && console.log(value, err));
-      console.log(`Wrote ${joined}`);
+      if (args.verbose) {
+        console.log(`Wrote ${joined}`);
+      }
     });
   } catch (e) {
     console.error(`Error parsing source map for ${guessedUrl}`);
@@ -75,14 +95,14 @@ const fetchAndParseJsFile = async (url: string) => {
     if (sourceContent) {
       args.verbose &&
         console.log(`Found source map content: ${sourceMappingURL}`);
-      await parseSourceMap(sourceContent, url);
+      await parseSourceMap(sourceContent, url, args.urlPathBasedSaving);
       return;
     }
     args.verbose &&
       console.log(`No source map content for: ${sourceMappingURL}`);
   }
 };
-
+const sourcesSeen = new Set<string>();
 const run = async (baseUrl: string) => {
   if (!BASE_URL || !OUT_DIR) {
     console.error(
@@ -109,12 +129,15 @@ const run = async (baseUrl: string) => {
     }
   });
 
-  if (!srcList.length) {
-    console.log("No sources found, bailing");
-    process.exit(0);
+  const unseenSrcList = srcList.filter((s) => !sourcesSeen.has(s));
+  unseenSrcList.forEach((s) => sourcesSeen.add(s));
+
+  if (!unseenSrcList.length) {
+    return;
   }
 
-  for (const s of srcList) {
+  for (const s of unseenSrcList) {
+    sourcesSeen.add(s);
     try {
       if (s.startsWith("http:") || s.startsWith("https:")) {
         await fetchAndParseJsFile(s);
@@ -136,6 +159,7 @@ if (args.crawl) {
   console.log(`Crawling ${BASE_URL}`);
 
   const urls = new Set<string>();
+  const promises: Promise<any>[] = [];
   const c = new Crawler({
     maxConnections: 10,
     // This will be called for each crawled page
@@ -163,20 +187,21 @@ if (args.crawl) {
       unique.forEach((u) => {
         if (!urls.has(u)) {
           urls.add(u);
+          promises.push(run(u));
           c.queue(u);
         }
       });
-      if (res?.options?.uri) {
-        urls.add(res.options.uri);
+      const uri = res?.options?.uri;
+      if (uri && !urls.has(uri)) {
+        urls.add(uri);
+        promises.push(run(uri));
       }
       done();
     },
   });
 
   c.on("drain", async () => {
-    for (const url of urls) {
-      await run(url);
-    }
+    await Promise.all(promises);
   });
 
   // Queue just one URL, with default callback

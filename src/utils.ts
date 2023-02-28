@@ -125,7 +125,13 @@ async function fetchPaths(possibleRequests, errorsAccumulator = "") {
   return result;
 }
 
-async function fetchFromURL(url, sourceRoot = "") {
+const protocolIsHttp = (
+  protocol: string | null
+): protocol is "https:" | "http:" => {
+  return protocol === "https:" || protocol === "http:";
+};
+
+async function fetchFromURL(url: string, sourceRoot = "") {
   // 1. It's an absolute url and it is not `windows` path like `C:\dir\file`
   if (/^[a-z][a-z0-9+.-]*:/i.test(url) && !path.win32.isAbsolute(url)) {
     const { protocol } = urlUtils.parse(url);
@@ -141,20 +147,24 @@ async function fetchFromURL(url, sourceRoot = "") {
       return { sourceURL, sourceContent };
     }
 
-    throw new Error(
-      `Failed to parse source map: '${url}' URL is not supported`
-    );
+    if (!protocolIsHttp(protocol)) {
+      throw new Error(
+        `Failed to parse source map: '${url}' URL is not supported`
+      );
+    }
   }
 
   // 2. It's a scheme-relative
   if (/^\/\//.test(url)) {
-    throw new Error(
-      `Failed to parse source map: '${url}' URL is not supported`
-    );
+    // just make it https?
+    url = `https:${url}`;
+    // throw new Error(
+    //   `Failed to parse source map: '${url}' URL is not supported`
+    // );
   }
 
   // 3. Absolute path
-  if (path.isAbsolute(url)) {
+  if (path.isAbsolute(url) || url.startsWith("http")) {
     const sourceURL = path.normalize(url);
     const possibleRequests = [sourceURL];
 
