@@ -24,10 +24,23 @@ const args = yargs(hideBin(process.argv))
         "Include the path in the url in the directory structure (warning, might create duplicate files)",
     },
     crawl: { type: "boolean", alias: "c", default: false },
+    headers: {
+      type: "string",
+      alias: "H",
+      default: [],
+      description:
+        'HTTP Headers to send, in the format "HeaderName: HeaderValue"',
+    },
     verbose: { type: "boolean", alias: "v", default: false },
   })
   .parseSync();
-
+const headers = {};
+if (args.headers) {
+  for (const header of args.headers) {
+    const [key, value] = header.split(": ");
+    headers[key] = value;
+  }
+}
 const BASE_URL = args.url;
 const OUT_DIR = args.dir;
 
@@ -91,7 +104,11 @@ const fetchAndParseJsFile = async (url: string) => {
   const { sourceMappingURL } = getSourceMappingURL(data);
   if (sourceMappingURL) {
     args.verbose && console.log(`Found source map url: ${sourceMappingURL}`);
-    const { sourceContent } = await fetchFromURL(sourceMappingURL, url);
+    const { sourceContent } = await fetchFromURL(
+      sourceMappingURL,
+      url,
+      headers
+    );
     if (sourceContent) {
       args.verbose &&
         console.log(`Found source map content: ${sourceMappingURL}`);
@@ -110,24 +127,29 @@ const run = async (baseUrl: string) => {
     );
     process.exit(1);
   }
-  const { data, request } = await axiosClient.get(baseUrl);
-  const dom = new JSDOM(data);
-  if (!dom) {
-    console.error("Invalid DOM");
-    process.exit(1);
-  }
-  const links = dom.window.document.querySelectorAll("script");
+
   const srcList: string[] = [];
-  links.forEach((l) => {
-    const src = l.src;
-    if (src && request) {
-      if (src.startsWith("//")) {
-        srcList.push(`${request.protocol || "https:"}${src}`);
-      } else {
-        srcList.push(src);
-      }
+  if (baseUrl.endsWith(".js")) {
+    srcList.push(baseUrl);
+  } else {
+    const { data, request } = await axiosClient.get(baseUrl, { headers });
+    const dom = new JSDOM(data);
+    if (!dom) {
+      console.error("Invalid DOM");
+    } else {
+      const links = dom.window.document.querySelectorAll("script");
+      links.forEach((l) => {
+        const src = l.src;
+        if (src && request) {
+          if (src.startsWith("//")) {
+            srcList.push(`${request.protocol || "https:"}${src}`);
+          } else {
+            srcList.push(src);
+          }
+        }
+      });
     }
-  });
+  }
 
   const unseenSrcList = srcList.filter((s) => !sourcesSeen.has(s));
   unseenSrcList.forEach((s) => sourcesSeen.add(s));

@@ -6,7 +6,7 @@ import * as iconv from "iconv-lite";
 const { decode } = iconv;
 import parseDataURL from "./parse-data-url";
 import labelsToNames from "./labels-to-names";
-import axios from "axios";
+import { axiosClient } from "./axiosClient";
 
 // Matches only the last occurrence of sourceMappingURL
 const innerRegex = /\s*[#@]\s*sourceMappingURL\s*=\s*([^\s'"]*)\s*/;
@@ -83,11 +83,11 @@ function fetchFromDataURL(sourceURL) {
   throw new Error(`Failed to parse source map from "data" URL: ${sourceURL}`);
 }
 
-async function fetchPath(sourceURL) {
+async function fetchPath(sourceURL, headers: Record<string, string>) {
   let buffer;
 
   try {
-    const { data } = await axios.get(sourceURL);
+    const { data } = await axiosClient.get(sourceURL, { headers });
     buffer = data;
   } catch (error) {
     throw new Error(
@@ -102,11 +102,15 @@ async function fetchPath(sourceURL) {
   };
 }
 
-async function fetchPaths(possibleRequests, errorsAccumulator = "") {
+async function fetchPaths(
+  possibleRequests,
+  errorsAccumulator = "",
+  headers: Record<string, string>
+) {
   let result;
 
   try {
-    result = await fetchPath(possibleRequests[0]);
+    result = await fetchPath(possibleRequests[0], headers);
   } catch (error: any) {
     // eslint-disable-next-line no-param-reassign
     errorsAccumulator += `${error.message}\n\n`;
@@ -119,7 +123,7 @@ async function fetchPaths(possibleRequests, errorsAccumulator = "") {
       throw error;
     }
 
-    return fetchPaths(tailPossibleRequests, errorsAccumulator);
+    return fetchPaths(tailPossibleRequests, errorsAccumulator, headers);
   }
 
   return result;
@@ -131,7 +135,11 @@ const protocolIsHttp = (
   return protocol === "https:" || protocol === "http:";
 };
 
-async function fetchFromURL(url: string, sourceRoot = "") {
+async function fetchFromURL(
+  url: string,
+  sourceRoot = "",
+  headers: Record<string, string>
+) {
   // 1. It's an absolute url and it is not `windows` path like `C:\dir\file`
   if (/^[a-z][a-z0-9+.-]*:/i.test(url) && !path.win32.isAbsolute(url)) {
     const { protocol } = urlUtils.parse(url);
@@ -143,7 +151,7 @@ async function fetchFromURL(url: string, sourceRoot = "") {
     if (protocol === "file:") {
       const pathFromURL = urlUtils.fileURLToPath(url);
       const sourceURL = path.normalize(pathFromURL);
-      const { data: sourceContent } = await fetchPath(sourceURL);
+      const { data: sourceContent } = await fetchPath(sourceURL, headers);
       return { sourceURL, sourceContent };
     }
 
@@ -172,7 +180,7 @@ async function fetchFromURL(url: string, sourceRoot = "") {
       possibleRequests.push(getAbsolutePath(sourceURL.slice(1), sourceRoot));
     }
 
-    const result = await fetchPaths(possibleRequests);
+    const result = await fetchPaths(possibleRequests, "", headers);
 
     return { sourceURL: result.path, sourceContent: result.data };
   }
@@ -180,7 +188,7 @@ async function fetchFromURL(url: string, sourceRoot = "") {
   // 4. Relative path
   const sourceURL = getAbsolutePath(url, sourceRoot);
 
-  const { data: sourceContent } = await fetchPath(sourceURL);
+  const { data: sourceContent } = await fetchPath(sourceURL, headers);
 
   return { sourceURL, sourceContent };
 }
