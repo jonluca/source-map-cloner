@@ -166,14 +166,19 @@ const getJsFilesFromManifest = async (url: string) => {
     const parsedUrl = new URL(request.path, BASE_URL);
     const splitPath = parsedUrl.pathname.split("/");
     return uniqueFiles.map((l) => {
+      if (l.startsWith("/")) {
+        return new URL(l, url).href;
+      }
       const split = l.split("/");
       // check first part of path, and join at that point
-      const index = splitPath.findIndex((p) => p === split[0]);
+      const index = splitPath.findLastIndex((p) => p === split[0]);
       if (index === -1) {
         return parsedUrl.origin + l;
       }
-      const fullUrl =
-        parsedUrl.origin + "/" + path.join(...splitPath.slice(0, index), l);
+      const fullUrl = new URL(
+        path.join(...splitPath.slice(0, index), l),
+        parsedUrl.origin
+      ).href;
       return fullUrl;
     });
   } catch (e) {
@@ -182,13 +187,18 @@ const getJsFilesFromManifest = async (url: string) => {
   }
 };
 
+const getFallbackUrl = (url: string) => {
+  const parsedUrl = new URL(url);
+  parsedUrl.pathname = parsedUrl.pathname + ".map";
+  return parsedUrl.href;
+};
 const fetchAndParseJsFile = async (url: string) => {
   const { data } = await axiosClient.get(url, { headers });
   const { sourceMappingURL } = getSourceMappingURL(data);
   if (args.verbose && sourceMappingURL) {
     logger.info(`Found source map url: ${sourceMappingURL}`);
   }
-  const urlWithFallback = sourceMappingURL || `${url}.map`;
+  const urlWithFallback = sourceMappingURL || getFallbackUrl(url);
   const { sourceContent } = await fetchFromURL(urlWithFallback, url, headers);
   if (sourceContent && sourceContent[0] !== "<") {
     args.verbose && logger.info(`Found source map content: ${urlWithFallback}`);
@@ -199,13 +209,6 @@ const fetchAndParseJsFile = async (url: string) => {
 };
 const sourcesSeen = new Set<string>();
 const run = async (baseUrl: string) => {
-  if (!BASE_URL || !OUT_DIR) {
-    logger.error(
-      "Must pass url as first argument and directory to save into as second"
-    );
-    process.exit(1);
-  }
-
   const srcList: string[] = [];
   const parsedUrl = new URL(baseUrl);
   if (baseUrl.endsWith(".js")) {
@@ -238,9 +241,7 @@ const run = async (baseUrl: string) => {
   if (manifest) {
     const files = await getJsFilesFromManifest(manifest);
     for (const file of files) {
-      const fullSrc = file.startsWith("http")
-        ? file
-        : path.join(parsedUrl.origin, file);
+      const fullSrc = new URL(file, parsedUrl).href;
       if (!sourcesSeen.has(fullSrc)) {
         unseenSrcList.push(fullSrc);
         sourcesSeen.add(fullSrc);
@@ -257,10 +258,8 @@ const run = async (baseUrl: string) => {
       if (s.startsWith("http:") || s.startsWith("https:")) {
         await fetchAndParseJsFile(s);
       } else {
-        parsedUrl.pathname = s?.startsWith("/")
-          ? s
-          : path.join(parsedUrl.pathname, s);
-        await fetchAndParseJsFile(parsedUrl.toString());
+        const fullUrl = new URL(s, parsedUrl).href;
+        await fetchAndParseJsFile(fullUrl);
       }
     } catch (e) {
       logger.error(`Error parsing source ${s}`);

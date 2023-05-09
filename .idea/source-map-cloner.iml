@@ -10,6 +10,7 @@
       <excludeFolder url="file://$MODULE_DIR$/cote3" />
       <excludeFolder url="file://$MODULE_DIR$/cupcake" />
       <excludeFolder url="file://$MODULE_DIR$/dist" />
+      <excludeFolder url="file://$MODULE_DIR$/hulu" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

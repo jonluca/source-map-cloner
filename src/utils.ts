@@ -87,8 +87,10 @@ async function fetchPath(sourceURL, headers: Record<string, string>) {
   let buffer;
 
   try {
-    const { data } = await axiosClient.get(sourceURL, { headers });
-    buffer = data;
+    const { data, status } = await axiosClient.get(sourceURL, { headers });
+    if (status < 400) {
+      buffer = data;
+    }
   } catch (error) {
     throw new Error(
       `Failed to parse source map from '${sourceURL}' file: ${error}`
@@ -98,7 +100,9 @@ async function fetchPath(sourceURL, headers: Record<string, string>) {
   return {
     path: sourceURL,
     data:
-      typeof buffer === "object" ? JSON.stringify(buffer) : buffer.toString(),
+      typeof buffer === "object"
+        ? JSON.stringify(buffer)
+        : buffer?.toString() || "",
   };
 }
 
