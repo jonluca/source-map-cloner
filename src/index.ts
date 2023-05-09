@@ -1,17 +1,21 @@
 #! /usr/bin/env node
 import jsdom from "jsdom";
-import * as path from "path";
-import * as fs from "fs";
+import path from "path";
+import fs from "fs";
 import type { RawSourceMap } from "source-map-js";
 import sourceMap from "source-map-js";
 import { fetchFromURL, getSourceMappingURL } from "./utils.js";
 import { axiosClient } from "./axiosClient.js";
-const { JSDOM } = jsdom;
-const { SourceMapConsumer } = sourceMap;
+
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import Crawler from "crawler";
 import { mkdirp } from "mkdirp";
+import UserAgent from "user-agents";
+
+const userAgent = new UserAgent();
+const { JSDOM } = jsdom;
+const { SourceMapConsumer } = sourceMap;
 
 const args = yargs(hideBin(process.argv))
   .options({
@@ -35,7 +39,20 @@ const args = yargs(hideBin(process.argv))
     verbose: { type: "boolean", alias: "v", default: false },
   })
   .parseSync();
-const headers = {};
+const headers = {
+  "accept-language": "en",
+  "cache-control": "max-age=0",
+  "sec-ch-ua":
+    '"Chromium";v="110", "Not A(Brand";v="24", "Google Chrome";v="110"',
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": '"macOS"',
+  "sec-fetch-dest": "document",
+  "sec-fetch-mode": "navigate",
+  "sec-fetch-site": "same-origin",
+  "sec-fetch-user": "?1",
+  "upgrade-insecure-requests": "1",
+  "user-agent": userAgent.toString(),
+};
 if (args.headers) {
   for (const header of args.headers) {
     const [key, value] = header.split(": ");
@@ -103,22 +120,17 @@ const parseSourceMap = async (
 const fetchAndParseJsFile = async (url: string) => {
   const { data } = await axiosClient.get(url);
   const { sourceMappingURL } = getSourceMappingURL(data);
-  if (sourceMappingURL) {
-    args.verbose && console.log(`Found source map url: ${sourceMappingURL}`);
-    const { sourceContent } = await fetchFromURL(
-      sourceMappingURL,
-      url,
-      headers
-    );
-    if (sourceContent) {
-      args.verbose &&
-        console.log(`Found source map content: ${sourceMappingURL}`);
-      await parseSourceMap(sourceContent, url, args.urlPathBasedSaving);
-      return;
-    }
-    args.verbose &&
-      console.log(`No source map content for: ${sourceMappingURL}`);
+  if (args.verbose && sourceMappingURL) {
+    console.log(`Found source map url: ${sourceMappingURL}`);
   }
+  const urlWithFallback = sourceMappingURL || `${url}.map`;
+  const { sourceContent } = await fetchFromURL(urlWithFallback, url, headers);
+  if (sourceContent && sourceContent[0] !== "<") {
+    args.verbose && console.log(`Found source map content: ${urlWithFallback}`);
+    await parseSourceMap(sourceContent, url, args.urlPathBasedSaving);
+    return;
+  }
+  args.verbose && console.log(`No source map content for: ${urlWithFallback}`);
 };
 const sourcesSeen = new Set<string>();
 const run = async (baseUrl: string) => {
@@ -185,6 +197,7 @@ if (args.crawl) {
   const promises: Promise<any>[] = [];
   const c = new Crawler({
     maxConnections: 10,
+    headers,
     // This will be called for each crawled page
     callback(error, res, done) {
       if (error) {
@@ -196,11 +209,14 @@ if (args.crawl) {
       const anchorTags = res.$("a");
       const urlsOnPage = (Array.from(anchorTags) as cheerio.TagElement[])
         .map((l) => l.attribs?.href)
-        .filter((l) => l && l.startsWith(BASE_URL));
+        .filter((l) => l && (l.startsWith(BASE_URL) || l.startsWith("/")));
+      const base = new URL(BASE_URL);
       const unique = [
         ...new Set(
           urlsOnPage.map((l) => {
-            const parsed = new URL(l);
+            const parsed = new URL(
+              l?.startsWith("/") ? `${base.origin}${l}` : l
+            );
             parsed.hash = "";
             parsed.search = "";
             return parsed.href;
