@@ -1,3 +1,4 @@
+#! /usr/bin/env node
 import jsdom from "jsdom";
 import * as path from "path";
 import * as fs from "fs";
