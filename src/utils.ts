@@ -4,9 +4,9 @@ import urlUtils from "url";
 
 import * as iconv from "iconv-lite";
 const { decode } = iconv;
-import parseDataURL from "./parse-data-url";
-import labelsToNames from "./labels-to-names";
-import { axiosClient } from "./axiosClient";
+import parseDataURL from "./parse-data-url.js";
+import labelsToNames from "./labels-to-names.js";
+import { axiosClient } from "./axiosClient.js";
 
 // Matches only the last occurrence of sourceMappingURL
 const innerRegex = /\s*[#@]\s*sourceMappingURL\s*=\s*([^\s'"]*)\s*/;
