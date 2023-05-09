@@ -1,9 +1,9 @@
 #! /usr/bin/env node
 import jsdom from "jsdom";
 import path from "path";
-import fs from "fs";
+import fs from "fs/promises";
 import type { RawSourceMap } from "source-map-js";
-import sourceMap from "source-map-js";
+import sourceMap from "source-map-consumer";
 import { fetchFromURL, getSourceMappingURL } from "./utils.js";
 import { axiosClient } from "./axiosClient.js";
 
@@ -12,11 +12,21 @@ import { hideBin } from "yargs/helpers";
 import Crawler from "crawler";
 import { mkdirp } from "mkdirp";
 import UserAgent from "user-agents";
+import { VM } from "vm2";
+import logger from "./logger.js";
 
 const userAgent = new UserAgent();
 const { JSDOM } = jsdom;
 const { SourceMapConsumer } = sourceMap;
 
+const fileExists = async (path: string) => {
+  try {
+    await fs.access(path);
+    return true;
+  } catch {
+    return false;
+  }
+};
 const args = yargs(hideBin(process.argv))
   .options({
     url: { type: "string", alias: "u", demandOption: true },
@@ -76,7 +86,15 @@ const parseSourceMap = async (
     const pathname = url.pathname;
     const dirname = path.parse(pathname).dir;
     const DIR_TO_SAVE = path.join(CWD, OUT_DIR);
-    parsed.sources.forEach(function (value, index) {
+    for (const source of parsed.sources) {
+      const index = parsed.sources.indexOf(source);
+      let value = source
+        .replace(/^webpack:\/\/_N_E\//, "")
+        .replace(/^(.*?):\/\//, "");
+      if (!value) {
+        // theres a weird thing where the source map is missing a source and its a directory?
+        continue;
+      }
       let joined = path.join(DIR_TO_SAVE, value);
       if (urlPathBasedSaving) {
         const paths = value.startsWith("/") ? pathname : dirname;
@@ -94,70 +112,108 @@ const parseSourceMap = async (
       const pathParsed = path.parse(joined);
 
       if (args.verbose && !pathParsed.dir.startsWith(DIR_TO_SAVE)) {
-        console.warn("Warning, saved output escapes directory");
+        logger.warn("Warning, saved output escapes directory");
       }
       if (pathParsed.dir) {
         mkdirp.sync(pathParsed.dir);
       }
-      if (args.verbose && fs.existsSync(joined)) {
-        console.warn(`${joined} path exists, overwriting`);
+      if (args.verbose && (await fileExists(joined))) {
+        logger.warn(`${joined} path exists, overwriting`);
       }
       const sourceCode = parsed.sourcesContent?.[index] || "";
       if (args.verbose && !sourceCode) {
-        console.warn(`No source code for ${value}`);
+        logger.warn(`No source code for ${value}`);
       }
-      fs.writeFile(joined, sourceCode, (err) => err && console.log(value, err));
+      try {
+        await fs.writeFile(joined, sourceCode);
+      } catch (e) {
+        logger.error(`Error writing ${joined} - ${e}`);
+      }
       if (args.verbose) {
-        console.log(`Wrote ${joined}`);
+        logger.info(`Wrote ${joined}`);
       }
-    });
+    }
   } catch (e) {
-    console.error(`Error parsing source map for ${guessedUrl}`);
-    console.error(e);
+    logger.error(`Error parsing source map for ${guessedUrl}`);
+    logger.error(e);
   }
 };
 
+const getJsFilesFromManifest = async (url: string) => {
+  const resp = await axiosClient.get(url, {
+    baseURL: BASE_URL,
+    headers,
+  });
+  const { data, request } = resp;
+  const newVm = new VM({ eval: false, wasm: false, allowAsync: false });
+  newVm.run(`const self = {};`);
+  newVm.run(data);
+  const manifest = JSON.parse(
+    newVm.run("JSON.stringify(self.__BUILD_MANIFEST)")
+  );
+  const values = Object.values(manifest).flat() as (string | object)[];
+  const strValues = values.filter((v) => typeof v === "string") as string[];
+  const jsFiles = strValues.filter((v) => v.endsWith(".js"));
+  const uniqueFiles = [...new Set(jsFiles)];
+  const parsedUrl = new URL(BASE_URL + request.path.slice(1));
+  const splitPath = parsedUrl.pathname.split("/");
+  return uniqueFiles.map((l) => {
+    const split = l.split("/");
+    // check first part of path, and join at that point
+    const index = splitPath.findIndex((p) => p === split[0]);
+    if (index === -1) {
+      return parsedUrl.origin + l;
+    }
+    const fullUrl =
+      parsedUrl.origin + "/" + path.join(...splitPath.slice(0, index), l);
+    return fullUrl;
+  });
+};
+
 const fetchAndParseJsFile = async (url: string) => {
-  const { data } = await axiosClient.get(url);
+  const { data } = await axiosClient.get(url, { headers });
   const { sourceMappingURL } = getSourceMappingURL(data);
   if (args.verbose && sourceMappingURL) {
-    console.log(`Found source map url: ${sourceMappingURL}`);
+    logger.info(`Found source map url: ${sourceMappingURL}`);
   }
   const urlWithFallback = sourceMappingURL || `${url}.map`;
   const { sourceContent } = await fetchFromURL(urlWithFallback, url, headers);
   if (sourceContent && sourceContent[0] !== "<") {
-    args.verbose && console.log(`Found source map content: ${urlWithFallback}`);
+    args.verbose && logger.info(`Found source map content: ${urlWithFallback}`);
     await parseSourceMap(sourceContent, url, args.urlPathBasedSaving);
     return;
   }
-  args.verbose && console.log(`No source map content for: ${urlWithFallback}`);
+  args.verbose && logger.info(`No source map content for: ${urlWithFallback}`);
 };
 const sourcesSeen = new Set<string>();
 const run = async (baseUrl: string) => {
   if (!BASE_URL || !OUT_DIR) {
-    console.error(
+    logger.error(
       "Must pass url as first argument and directory to save into as second"
     );
     process.exit(1);
   }
 
   const srcList: string[] = [];
+  const parsedUrl = new URL(baseUrl);
   if (baseUrl.endsWith(".js")) {
     srcList.push(baseUrl);
   } else {
     const { data, request } = await axiosClient.get(baseUrl, { headers });
     const dom = new JSDOM(data);
     if (!dom) {
-      console.error("Invalid DOM");
+      logger.error("Invalid DOM");
     } else {
       const links = dom.window.document.querySelectorAll("script");
       links.forEach((l) => {
         const src = l.src;
-        if (src && request) {
-          if (src.startsWith("//")) {
+        if (src) {
+          if (src.startsWith("//") && request) {
             srcList.push(`${request.protocol || "https:"}${src}`);
           } else {
-            srcList.push(src);
+            srcList.push(
+              src.startsWith("/") ? src : path.join(parsedUrl.origin, src)
+            );
           }
         }
       });
@@ -166,7 +222,19 @@ const run = async (baseUrl: string) => {
 
   const unseenSrcList = srcList.filter((s) => !sourcesSeen.has(s));
   unseenSrcList.forEach((s) => sourcesSeen.add(s));
-
+  const manifest = unseenSrcList.find((s) => s.endsWith("_buildManifest.js"));
+  if (manifest) {
+    const files = await getJsFilesFromManifest(manifest);
+    for (const file of files) {
+      const fullSrc = file.startsWith("http")
+        ? file
+        : path.join(parsedUrl.origin, file);
+      if (!sourcesSeen.has(fullSrc)) {
+        unseenSrcList.push(fullSrc);
+        sourcesSeen.add(fullSrc);
+      }
+    }
+  }
   if (!unseenSrcList.length) {
     return;
   }
@@ -177,21 +245,20 @@ const run = async (baseUrl: string) => {
       if (s.startsWith("http:") || s.startsWith("https:")) {
         await fetchAndParseJsFile(s);
       } else {
-        const parsedUrl = new URL(baseUrl);
         parsedUrl.pathname = s?.startsWith("/")
           ? s
           : path.join(parsedUrl.pathname, s);
         await fetchAndParseJsFile(parsedUrl.toString());
       }
     } catch (e) {
-      console.error(`Error parsing source ${s}`);
-      console.error(e);
+      logger.error(`Error parsing source ${s}`);
+      logger.error(e);
     }
   }
-  console.error(`Done`);
+  logger.info(`Done`);
 };
 if (args.crawl) {
-  console.log(`Crawling ${BASE_URL}`);
+  logger.info(`Crawling ${BASE_URL}`);
 
   const urls = new Set<string>();
   const promises: Promise<any>[] = [];
