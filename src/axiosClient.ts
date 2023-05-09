@@ -8,6 +8,8 @@ export const jar = new CookieJar(undefined, {
   looseMode: true,
   rejectPublicSuffixes: false,
 });
+const timeout = 60 * 15 * 1000; // 15 minutes
+
 export function requestInterceptor(
   config: InternalAxiosRequestConfig
 ): InternalAxiosRequestConfig {
@@ -18,10 +20,12 @@ export function requestInterceptor(
   config.httpAgent = new HttpCookieAgent({
     cookies: { jar: config.jar },
     keepAlive: true,
+    timeout,
   });
   config.httpsAgent = new HttpsCookieAgent({
     cookies: { jar: config.jar },
     keepAlive: true,
+    timeout,
     ciphers: [
       "TLS_AES_128_GCM_SHA256",
       "TLS_AES_256_GCM_SHA384",
@@ -63,6 +67,7 @@ const client = axios.create({
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
   },
   validateStatus: () => true,
+  timeout, // 15 minutes
 });
 client.interceptors.request.use(requestInterceptor);
 export const axiosClient = client;

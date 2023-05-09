@@ -70,6 +70,13 @@ if (args.headers) {
   }
 }
 const BASE_URL = args.url;
+try {
+  new URL(BASE_URL);
+} catch (e) {
+  logger.error("Invalid URL");
+  process.exit(1);
+}
+const baseUrl = new URL(BASE_URL);
 const OUT_DIR = args.dir;
 
 const CWD = process.cwd();
@@ -140,34 +147,39 @@ const parseSourceMap = async (
 };
 
 const getJsFilesFromManifest = async (url: string) => {
-  const resp = await axiosClient.get(url, {
-    baseURL: BASE_URL,
-    headers,
-  });
-  const { data, request } = resp;
-  const newVm = new VM({ eval: false, wasm: false, allowAsync: false });
-  newVm.run(`const self = {};`);
-  newVm.run(data);
-  const manifest = JSON.parse(
-    newVm.run("JSON.stringify(self.__BUILD_MANIFEST)")
-  );
-  const values = Object.values(manifest).flat() as (string | object)[];
-  const strValues = values.filter((v) => typeof v === "string") as string[];
-  const jsFiles = strValues.filter((v) => v.endsWith(".js"));
-  const uniqueFiles = [...new Set(jsFiles)];
-  const parsedUrl = new URL(BASE_URL + request.path.slice(1));
-  const splitPath = parsedUrl.pathname.split("/");
-  return uniqueFiles.map((l) => {
-    const split = l.split("/");
-    // check first part of path, and join at that point
-    const index = splitPath.findIndex((p) => p === split[0]);
-    if (index === -1) {
-      return parsedUrl.origin + l;
-    }
-    const fullUrl =
-      parsedUrl.origin + "/" + path.join(...splitPath.slice(0, index), l);
-    return fullUrl;
-  });
+  try {
+    const resp = await axiosClient.get(url, {
+      baseURL: baseUrl.origin,
+      headers,
+    });
+    const { data, request } = resp;
+    const newVm = new VM({ eval: false, wasm: false, allowAsync: false });
+    newVm.run(`const self = {};`);
+    newVm.run(data);
+    const manifest = JSON.parse(
+      newVm.run("JSON.stringify(self.__BUILD_MANIFEST)")
+    );
+    const values = Object.values(manifest).flat() as (string | object)[];
+    const strValues = values.filter((v) => typeof v === "string") as string[];
+    const jsFiles = strValues.filter((v) => v.endsWith(".js"));
+    const uniqueFiles = [...new Set(jsFiles)];
+    const parsedUrl = new URL(request.path, BASE_URL);
+    const splitPath = parsedUrl.pathname.split("/");
+    return uniqueFiles.map((l) => {
+      const split = l.split("/");
+      // check first part of path, and join at that point
+      const index = splitPath.findIndex((p) => p === split[0]);
+      if (index === -1) {
+        return parsedUrl.origin + l;
+      }
+      const fullUrl =
+        parsedUrl.origin + "/" + path.join(...splitPath.slice(0, index), l);
+      return fullUrl;
+    });
+  } catch (e) {
+    logger.error(e);
+    return [];
+  }
 };
 
 const fetchAndParseJsFile = async (url: string) => {
@@ -208,19 +220,19 @@ const run = async (baseUrl: string) => {
       links.forEach((l) => {
         const src = l.src;
         if (src) {
-          if (src.startsWith("//") && request) {
-            srcList.push(`${request.protocol || "https:"}${src}`);
+          if (src.startsWith("//")) {
+            srcList.push(`${request?.protocol || "https:"}${src}`);
           } else {
-            srcList.push(
-              src.startsWith("/") ? src : path.join(parsedUrl.origin, src)
-            );
+            srcList.push(src);
           }
         }
       });
     }
   }
 
-  const unseenSrcList = srcList.filter((s) => !sourcesSeen.has(s));
+  const absoluteSrcList = srcList.map((s) => new URL(s, baseUrl).href);
+
+  const unseenSrcList = absoluteSrcList.filter((s) => !sourcesSeen.has(s));
   unseenSrcList.forEach((s) => sourcesSeen.add(s));
   const manifest = unseenSrcList.find((s) => s.endsWith("_buildManifest.js"));
   if (manifest) {

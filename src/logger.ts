@@ -17,7 +17,13 @@ export const print = printf((info) => {
   );
 });
 
-const localFormat = combine(ts, colorize(), splat(), errors({ stack: true }), print);
+const localFormat = combine(
+  ts,
+  colorize(),
+  splat(),
+  errors({ stack: true }),
+  print
+);
 
 export const logger = winston.createLogger({
   level: "debug",
@@ -30,11 +36,11 @@ export const logger = winston.createLogger({
 
 const oldError = logger.error;
 logger.error = ((...args) => {
-  const err = args[0] || {};
+  let err = args[0] || {};
   if (!(err instanceof Error)) {
     const stack = new Error().stack;
     if (typeof err === "string") {
-      args[0] = { message: err, stack };
+      err = { message: err, stack };
     } else {
       err.stack = stack;
     }
@@ -45,6 +51,7 @@ logger.error = ((...args) => {
   }
   args[0] = err;
 
+  // @ts-ignore
   return oldError(...args);
 }) as LeveledLogMethod;
 
