@@ -8,9 +8,15 @@
       <excludeFolder url="file://$MODULE_DIR$/cote" />
       <excludeFolder url="file://$MODULE_DIR$/cote2" />
       <excludeFolder url="file://$MODULE_DIR$/cote3" />
+      <excludeFolder url="file://$MODULE_DIR$/angel" />
+      <excludeFolder url="file://$MODULE_DIR$/chime" />
       <excludeFolder url="file://$MODULE_DIR$/cupcake" />
       <excludeFolder url="file://$MODULE_DIR$/dist" />
       <excludeFolder url="file://$MODULE_DIR$/hulu" />
+      <excludeFolder url="file://$MODULE_DIR$/location.westernunion.com" />
+      <excludeFolder url="file://$MODULE_DIR$/myfico" />
+      <excludeFolder url="file://$MODULE_DIR$/www.hilton.com" />
+      <excludeFolder url="file://$MODULE_DIR$/www.ign.com" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

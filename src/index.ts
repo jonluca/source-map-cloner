@@ -14,8 +14,9 @@ import { mkdirp } from "mkdirp";
 import UserAgent from "user-agents";
 import { VM } from "vm2";
 import logger from "./logger.js";
+import pMap from "p-map";
 
-const userAgent = new UserAgent();
+const userAgent = new UserAgent({ deviceCategory: "desktop" });
 const { JSDOM } = jsdom;
 const { SourceMapConsumer } = sourceMap;
 
@@ -30,7 +31,7 @@ const fileExists = async (path: string) => {
 const args = yargs(hideBin(process.argv))
   .options({
     url: { type: "string", alias: "u", demandOption: true },
-    dir: { type: "string", demandOption: true, alias: "d" },
+    dir: { type: "string", alias: "d" },
     urlPathBasedSaving: {
       type: "boolean",
       demandOption: false,
@@ -77,7 +78,7 @@ try {
   process.exit(1);
 }
 const baseUrl = new URL(BASE_URL);
-const OUT_DIR = args.dir;
+const OUT_DIR = args.dir || baseUrl.hostname;
 
 const CWD = process.cwd();
 const parseSourceMap = async (
@@ -94,6 +95,10 @@ const parseSourceMap = async (
     const dirname = path.parse(pathname).dir;
     const DIR_TO_SAVE = path.join(CWD, OUT_DIR);
     for (const source of parsed.sources) {
+      // skip synthetic sources
+      if (source.startsWith("[synthetic:")) {
+        continue;
+      }
       const index = parsed.sources.indexOf(source);
       let value = source
         .replace(/^webpack:\/\/_N_E\//, "")
@@ -116,10 +121,26 @@ const parseSourceMap = async (
       if (joined.endsWith("/")) {
         joined = joined.slice(0, -1);
       }
-      const pathParsed = path.parse(joined);
+      let pathParsed = path.parse(joined);
 
       if (args.verbose && !pathParsed.dir.startsWith(DIR_TO_SAVE)) {
-        logger.warn("Warning, saved output escapes directory");
+        logger.warn(
+          "Warning, saved output escapes directory, modifying output to save in correct directory"
+        );
+      }
+      let newJoined = value;
+      const maxCount = 100;
+      let count = 0;
+      while (!pathParsed.dir.startsWith(DIR_TO_SAVE) && count < maxCount) {
+        newJoined = newJoined.replace("../", "");
+        joined = path.join(DIR_TO_SAVE, newJoined);
+        pathParsed = path.parse(joined);
+        count++;
+      }
+
+      if (count >= maxCount) {
+        logger.error("Error, too many ../ in path");
+        continue;
       }
       if (pathParsed.dir) {
         mkdirp.sync(pathParsed.dir);
@@ -173,12 +194,10 @@ const getJsFilesFromManifest = async (url: string) => {
       // check first part of path, and join at that point
       const index = splitPath.findLastIndex((p) => p === split[0]);
       if (index === -1) {
-        return parsedUrl.origin + l;
+        return new URL(l, url).href;
       }
-      const fullUrl = new URL(
-        path.join(...splitPath.slice(0, index), l),
-        parsedUrl.origin
-      ).href;
+      const urlPath = path.join(...splitPath.slice(0, index), l);
+      const fullUrl = new URL(urlPath, parsedUrl.origin).href;
       return fullUrl;
     });
   } catch (e) {
@@ -189,6 +208,9 @@ const getJsFilesFromManifest = async (url: string) => {
 
 const getFallbackUrl = (url: string) => {
   const parsedUrl = new URL(url);
+  if (!parsedUrl.pathname.endsWith(".js")) {
+    return null;
+  }
   parsedUrl.pathname = parsedUrl.pathname + ".map";
   return parsedUrl.href;
 };
@@ -199,13 +221,17 @@ const fetchAndParseJsFile = async (url: string) => {
     logger.info(`Found source map url: ${sourceMappingURL}`);
   }
   const urlWithFallback = sourceMappingURL || getFallbackUrl(url);
-  const { sourceContent } = await fetchFromURL(urlWithFallback, url, headers);
-  if (sourceContent && sourceContent[0] !== "<") {
-    args.verbose && logger.info(`Found source map content: ${urlWithFallback}`);
-    await parseSourceMap(sourceContent, url, args.urlPathBasedSaving);
-    return;
+  if (urlWithFallback) {
+    const { sourceContent } = await fetchFromURL(urlWithFallback, url, headers);
+    if (sourceContent && sourceContent[0] !== "<") {
+      args.verbose &&
+        logger.info(`Found source map content: ${urlWithFallback}`);
+      await parseSourceMap(sourceContent, url, args.urlPathBasedSaving);
+      return;
+    }
+    args.verbose &&
+      logger.info(`No source map content for: ${urlWithFallback}`);
   }
-  args.verbose && logger.info(`No source map content for: ${urlWithFallback}`);
 };
 const sourcesSeen = new Set<string>();
 const run = async (baseUrl: string) => {
@@ -227,6 +253,21 @@ const run = async (baseUrl: string) => {
             srcList.push(`${request?.protocol || "https:"}${src}`);
           } else {
             srcList.push(src);
+          }
+        }
+      });
+
+      const hrefs = dom.window.document.querySelectorAll("[href]");
+      hrefs.forEach((l) => {
+        const href = l.href;
+        if (href) {
+          const url = new URL(href, baseUrl);
+          if (url.pathname.endsWith(".js")) {
+            if (href.startsWith("//")) {
+              srcList.push(`${request?.protocol || "https:"}${href}`);
+            } else {
+              srcList.push(href);
+            }
           }
         }
       });
@@ -252,22 +293,28 @@ const run = async (baseUrl: string) => {
     return;
   }
 
-  for (const s of unseenSrcList) {
-    sourcesSeen.add(s);
-    try {
-      if (s.startsWith("http:") || s.startsWith("https:")) {
-        await fetchAndParseJsFile(s);
-      } else {
-        const fullUrl = new URL(s, parsedUrl).href;
-        await fetchAndParseJsFile(fullUrl);
+  await pMap(
+    unseenSrcList,
+    async (s) => {
+      try {
+        if (s.startsWith("http:") || s.startsWith("https:")) {
+          await fetchAndParseJsFile(s);
+        } else {
+          const fullUrl = new URL(s, parsedUrl).href;
+          await fetchAndParseJsFile(fullUrl);
+        }
+      } catch (e) {
+        logger.error(`Error parsing source ${s}`);
+        logger.error(e);
       }
-    } catch (e) {
-      logger.error(`Error parsing source ${s}`);
-      logger.error(e);
-    }
-  }
-  logger.info(`Done`);
+    },
+    { concurrency: 20 }
+  );
+
+  logger.info(`Finished ${baseUrl}`);
 };
+
+logger.info(`Starting cloning source maps of ${BASE_URL}`);
 if (args.crawl) {
   logger.info(`Crawling ${BASE_URL}`);
 
