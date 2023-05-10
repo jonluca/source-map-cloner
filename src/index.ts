@@ -241,7 +241,17 @@ const run = async (baseUrl: string) => {
     srcList.push(baseUrl);
   } else {
     const { data, request } = await axiosClient.get(baseUrl, { headers });
-    const dom = new JSDOM(data);
+    const virtualConsole = new jsdom.VirtualConsole();
+
+    const dom = new JSDOM(data, {
+      runScripts: "dangerously",
+      resources: "usable",
+      url: baseUrl,
+      pretendToBeVisual: true,
+      cookieJar: axiosClient.defaults.jar,
+      userAgent: headers["user-agent"],
+      virtualConsole,
+    });
     if (!dom) {
       logger.error("Invalid DOM");
     } else {
