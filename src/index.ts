@@ -267,7 +267,9 @@ const run = async (baseUrl: string) => {
         }
       });
 
-      const hrefs = dom.window.document.querySelectorAll("[href]");
+      const hrefs = dom.window.document.querySelectorAll(
+        "[href]"
+      ) as NodeListOf<HTMLAnchorElement>;
       hrefs.forEach((l) => {
         const href = l.href;
         if (href) {
