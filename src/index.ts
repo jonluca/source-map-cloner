@@ -240,10 +240,10 @@ const run = async (baseUrl: string) => {
   if (baseUrl.endsWith(".js")) {
     srcList.push(baseUrl);
   } else {
-    const { data, request } = await axiosClient.get(baseUrl, { headers });
-    const virtualConsole = new jsdom.VirtualConsole();
-
     try {
+      const { data, request } = await axiosClient.get(baseUrl, { headers });
+      const virtualConsole = new jsdom.VirtualConsole();
+
       const dom = new JSDOM(data, {
         runScripts: "dangerously",
         resources: "usable",
