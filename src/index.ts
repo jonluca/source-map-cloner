@@ -243,46 +243,50 @@ const run = async (baseUrl: string) => {
     const { data, request } = await axiosClient.get(baseUrl, { headers });
     const virtualConsole = new jsdom.VirtualConsole();
 
-    const dom = new JSDOM(data, {
-      runScripts: "dangerously",
-      resources: "usable",
-      url: baseUrl,
-      pretendToBeVisual: true,
-      cookieJar: axiosClient.defaults.jar,
-      userAgent: headers["user-agent"],
-      virtualConsole,
-    });
-    if (!dom) {
-      logger.error("Invalid DOM");
-    } else {
-      const links = dom.window.document.querySelectorAll("script");
-      links.forEach((l) => {
-        const src = l.src;
-        if (src) {
-          if (src.startsWith("//")) {
-            srcList.push(`${request?.protocol || "https:"}${src}`);
-          } else {
-            srcList.push(src);
-          }
-        }
+    try {
+      const dom = new JSDOM(data, {
+        runScripts: "dangerously",
+        resources: "usable",
+        url: baseUrl,
+        pretendToBeVisual: true,
+        cookieJar: axiosClient.defaults.jar,
+        userAgent: headers["user-agent"],
+        virtualConsole,
       });
-
-      const hrefs = dom.window.document.querySelectorAll(
-        "[href]"
-      ) as NodeListOf<HTMLAnchorElement>;
-      hrefs.forEach((l) => {
-        const href = l.href;
-        if (href) {
-          const url = new URL(href, baseUrl);
-          if (url.pathname.endsWith(".js")) {
-            if (href.startsWith("//")) {
-              srcList.push(`${request?.protocol || "https:"}${href}`);
+      if (!dom) {
+        logger.error("Invalid DOM");
+      } else {
+        const links = dom.window.document.querySelectorAll("script");
+        links.forEach((l) => {
+          const src = l.src;
+          if (src) {
+            if (src.startsWith("//")) {
+              srcList.push(`${request?.protocol || "https:"}${src}`);
             } else {
-              srcList.push(href);
+              srcList.push(src);
             }
           }
-        }
-      });
+        });
+
+        const hrefs = dom.window.document.querySelectorAll(
+          "[href]"
+        ) as NodeListOf<HTMLAnchorElement>;
+        hrefs.forEach((l) => {
+          const href = l.href;
+          if (href) {
+            const url = new URL(href, baseUrl);
+            if (url.pathname.endsWith(".js")) {
+              if (href.startsWith("//")) {
+                srcList.push(`${request?.protocol || "https:"}${href}`);
+              } else {
+                srcList.push(href);
+              }
+            }
+          }
+        });
+      }
+    } catch (e) {
+      logger.error(e);
     }
   }
 
@@ -326,7 +330,16 @@ const run = async (baseUrl: string) => {
   logger.info(`Finished ${baseUrl}`);
 };
 
-logger.info(`Starting cloning source maps of ${BASE_URL}`);
+process.on("uncaughtException", function (err) {
+  const isJsdomError = err.stack?.includes("jsdom");
+  if (isJsdomError) {
+    logger.error(err);
+    return;
+  }
+  throw err;
+});
+
+logger.info(`Started cloning source maps of ${BASE_URL}`);
 if (args.crawl) {
   logger.info(`Crawling ${BASE_URL}`);
 
