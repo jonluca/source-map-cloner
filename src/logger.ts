@@ -17,13 +17,7 @@ export const print = printf((info) => {
   );
 });
 
-const localFormat = combine(
-  ts,
-  colorize(),
-  splat(),
-  errors({ stack: true }),
-  print
-);
+const localFormat = combine(ts, colorize(), errors({ stack: true }), print);
 
 export const logger = winston.createLogger({
   level: "debug",
@@ -49,7 +43,7 @@ logger.error = ((...args) => {
   if (!err.message) {
     err.message = "Unknown error";
   }
-  args[0] = err;
+  args[0] = JSON.parse(JSON.stringify(err, Object.getOwnPropertyNames(err)));
 
   // @ts-ignore
   return oldError(...args);

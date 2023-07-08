@@ -51,6 +51,8 @@ const args = yargs(hideBin(process.argv))
   })
   .parseSync();
 const headers = {
+  accept:
+    "*/*,text/html,application/xhtml+xml,application/xml;q=0.9,application/json,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
   "accept-language": "en",
   "cache-control": "max-age=0",
   "sec-ch-ua":
@@ -84,11 +86,11 @@ const CWD = process.cwd();
 const parseSourceMap = async (
   sourceMap,
   guessedUrl: string,
-  urlPathBasedSaving: boolean | undefined
+  urlPathBasedSaving: boolean | undefined,
 ) => {
   try {
     const parsed = (await new SourceMapConsumer(
-      typeof sourceMap === "string" ? JSON.parse(sourceMap) : sourceMap
+      typeof sourceMap === "string" ? JSON.parse(sourceMap) : sourceMap,
     )) as unknown as RawSourceMap;
     const url = new URL(guessedUrl);
     const pathname = url.pathname;
@@ -125,7 +127,7 @@ const parseSourceMap = async (
 
       if (args.verbose && !pathParsed.dir.startsWith(DIR_TO_SAVE)) {
         logger.warn(
-          "Warning, saved output escapes directory, modifying output to save in correct directory"
+          "Warning, saved output escapes directory, modifying output to save in correct directory",
         );
       }
       let newJoined = value;
@@ -162,8 +164,7 @@ const parseSourceMap = async (
       }
     }
   } catch (e) {
-    logger.error(`Error parsing source map for ${guessedUrl}`);
-    logger.error(e);
+    logger.error(`Error parsing source map for ${guessedUrl}: ${e}`);
   }
 };
 
@@ -178,7 +179,7 @@ const getJsFilesFromManifest = async (url: string) => {
     newVm.run(`const self = {};`);
     newVm.run(data);
     const manifest = JSON.parse(
-      newVm.run("JSON.stringify(self.__BUILD_MANIFEST)")
+      newVm.run("JSON.stringify(self.__BUILD_MANIFEST)"),
     );
     const values = Object.values(manifest).flat() as (string | object)[];
     const strValues = values.filter((v) => typeof v === "string") as string[];
@@ -241,7 +242,8 @@ const run = async (baseUrl: string) => {
     srcList.push(baseUrl);
   } else {
     try {
-      const { data, request } = await axiosClient.get(baseUrl, { headers });
+      const resp = await axiosClient.get(baseUrl, { headers });
+      const { data, request } = resp;
       const virtualConsole = new jsdom.VirtualConsole();
 
       const dom = new JSDOM(data, {
@@ -269,7 +271,7 @@ const run = async (baseUrl: string) => {
         });
 
         const hrefs = dom.window.document.querySelectorAll(
-          "[href]"
+          "[href]",
         ) as NodeListOf<HTMLAnchorElement>;
         hrefs.forEach((l) => {
           const href = l.href;
@@ -305,9 +307,6 @@ const run = async (baseUrl: string) => {
       }
     }
   }
-  if (!unseenSrcList.length) {
-    return;
-  }
 
   await pMap(
     unseenSrcList,
@@ -324,7 +323,7 @@ const run = async (baseUrl: string) => {
         logger.error(e);
       }
     },
-    { concurrency: 20 }
+    { concurrency: 20 },
   );
 
   logger.info(`Finished ${baseUrl}`);
@@ -365,12 +364,12 @@ if (args.crawl) {
         ...new Set(
           urlsOnPage.map((l) => {
             const parsed = new URL(
-              l?.startsWith("/") ? `${base.origin}${l}` : l
+              l?.startsWith("/") ? `${base.origin}${l}` : l,
             );
             parsed.hash = "";
             parsed.search = "";
             return parsed.href;
-          })
+          }),
         ),
       ];
       unique.forEach((u) => {
