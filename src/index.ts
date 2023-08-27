@@ -235,6 +235,7 @@ const fetchAndParseJsFile = async (url: string) => {
   }
 };
 const sourcesSeen = new Set<string>();
+const jsRegex = /(?<=")([^"]+\.js)(?=")/gi;
 const run = async (baseUrl: string) => {
   const srcList: string[] = [];
   const parsedUrl = new URL(baseUrl);
@@ -287,6 +288,19 @@ const run = async (baseUrl: string) => {
           }
         });
       }
+      const regexMatched = data.match(jsRegex);
+      if (regexMatched) {
+        for (const match of regexMatched) {
+          try {
+            const url = new URL(match, baseUrl);
+            srcList.push(url.href);
+          } catch (e) {
+            if (args.verbose) {
+              logger.error(`Error parsing regex match ${match} - ${e}`);
+            }
+          }
+        }
+      }
     } catch (e) {
       logger.error(e);
     }
@@ -327,15 +341,19 @@ const run = async (baseUrl: string) => {
   );
 
   logger.info(`Finished ${baseUrl}`);
+  if (!args.crawl) {
+    process.exit(0);
+  }
 };
 
 process.on("uncaughtException", function (err) {
-  const isJsdomError = err.stack?.includes("jsdom");
+  const isJsdomError =
+    err.stack?.includes("jsdom") || err.stack?.includes("at https://");
   if (isJsdomError) {
     logger.error(err);
     return;
   }
-  throw err;
+  return;
 });
 
 logger.info(`Started cloning source maps of ${BASE_URL}`);
@@ -390,6 +408,8 @@ if (args.crawl) {
 
   c.on("drain", async () => {
     await Promise.all(promises);
+    logger.info(`Finished crawling ${BASE_URL}`);
+    process.exit(0);
   });
 
   // Queue just one URL, with default callback
