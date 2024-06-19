@@ -6,12 +6,11 @@ import * as iconv from "iconv-lite";
 const { decode } = iconv;
 import parseDataURL from "./parse-data-url.js";
 import labelsToNames from "./labels-to-names.js";
-import { axiosClient } from "./axiosClient.js";
+import { gotClient } from "./http";
 
 // Matches only the last occurrence of sourceMappingURL
 const innerRegex = /\s*[#@]\s*sourceMappingURL\s*=\s*([^\s'"]*)\s*/;
 
-/* eslint-disable prefer-template */
 const sourceMappingURLRegex = RegExp(
   "(?:" +
     "/\\*" +
@@ -26,9 +25,8 @@ const sourceMappingURLRegex = RegExp(
     innerRegex.source +
     ")" +
     ")" +
-    "\\s*"
+    "\\s*",
 );
-/* eslint-enable prefer-template */
 
 function labelToName(label) {
   const labelLowercase = String(label).trim().toLowerCase();
@@ -87,13 +85,15 @@ async function fetchPath(sourceURL, headers: Record<string, string>) {
   let buffer;
 
   try {
-    const { data, status } = await axiosClient.get(sourceURL, { headers });
+    const { body: data, statusCode: status } = await gotClient(sourceURL, {
+      headers,
+    });
     if (status < 400) {
       buffer = data;
     }
   } catch (error) {
     throw new Error(
-      `Failed to parse source map from '${sourceURL}' file: ${error}`
+      `Failed to parse source map from '${sourceURL}' file: ${error}`,
     );
   }
 
@@ -109,14 +109,13 @@ async function fetchPath(sourceURL, headers: Record<string, string>) {
 async function fetchPaths(
   possibleRequests,
   errorsAccumulator = "",
-  headers: Record<string, string>
+  headers: Record<string, string>,
 ) {
   let result;
 
   try {
     result = await fetchPath(possibleRequests[0], headers);
   } catch (error: any) {
-    // eslint-disable-next-line no-param-reassign
     errorsAccumulator += `${error.message}\n\n`;
 
     const [, ...tailPossibleRequests] = possibleRequests;
@@ -134,7 +133,7 @@ async function fetchPaths(
 }
 
 const protocolIsHttp = (
-  protocol: string | null
+  protocol: string | null,
 ): protocol is "https:" | "http:" => {
   return protocol === "https:" || protocol === "http:";
 };
@@ -142,7 +141,7 @@ const protocolIsHttp = (
 async function fetchFromURL(
   url: string,
   sourceRoot = "",
-  headers: Record<string, string>
+  headers: Record<string, string>,
 ) {
   // 1. It's an absolute url and it is not `windows` path like `C:\dir\file`
   if (/^[a-z][a-z0-9+.-]*:/i.test(url) && !path.win32.isAbsolute(url)) {
@@ -161,7 +160,7 @@ async function fetchFromURL(
 
     if (!protocolIsHttp(protocol)) {
       throw new Error(
-        `Failed to parse source map: '${url}' URL is not supported`
+        `Failed to parse source map: '${url}' URL is not supported`,
       );
     }
   }

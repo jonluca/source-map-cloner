@@ -1,4 +1,3 @@
-import type { LeveledLogMethod } from "winston";
 import winston from "winston";
 import { MESSAGE } from "triple-beam";
 const { combine, timestamp, printf, colorize, errors, splat } = winston.format;
@@ -27,26 +26,5 @@ export const logger = winston.createLogger({
     }),
   ],
 });
-
-const oldError = logger.error;
-logger.error = ((...args) => {
-  let err = args[0] || {};
-  if (!(err instanceof Error)) {
-    const stack = new Error().stack;
-    if (typeof err === "string") {
-      err = { message: err, stack };
-    } else {
-      err.stack = stack;
-    }
-  }
-
-  if (!err.message) {
-    err.message = "Unknown error";
-  }
-  args[0] = JSON.parse(JSON.stringify(err, Object.getOwnPropertyNames(err)));
-
-  // @ts-ignore
-  return oldError(...args);
-}) as LeveledLogMethod;
 
 export default logger;

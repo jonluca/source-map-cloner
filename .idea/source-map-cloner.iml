@@ -18,6 +18,12 @@
       <excludeFolder url="file://$MODULE_DIR$/www.ign.com" />
       <excludeFolder url="file://$MODULE_DIR$/www.ratemyprofessors.com" />
       <excludeFolder url="file://$MODULE_DIR$/www.sevenrooms.com" />
+      <excludeFolder url="file://$MODULE_DIR$/angel_oct23" />
+      <excludeFolder url="file://$MODULE_DIR$/angel" />
+      <excludeFolder url="file://$MODULE_DIR$/angel_nov23" />
+      <excludeFolder url="file://$MODULE_DIR$/venture.angellist.com" />
+      <excludeFolder url="file://$MODULE_DIR$/civit" />
+      <excludeFolder url="file://$MODULE_DIR$/suno" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

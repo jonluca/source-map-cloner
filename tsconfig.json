@@ -7,7 +7,7 @@
     "forceConsistentCasingInFileNames": true,
     "esModuleInterop": true,
     "module": "esnext",
-    "moduleResolution": "Node",
+    "moduleResolution": "Bundler",
     "resolveJsonModule": true,
     "outDir": "dist",
     "noImplicitAny": false,
@@ -17,8 +17,7 @@
     "baseUrl": ".",
     "incremental": true,
     "downlevelIteration": true,
-    "checkJs": false,
-    "typeRoots": ["node_modules/@types", "src/types"]
+    "checkJs": false
   },
   "include": ["src/**/*.ts", "src/types/*.d.ts"]
 }

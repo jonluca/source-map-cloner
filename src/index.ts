@@ -5,8 +5,6 @@ import fs from "fs/promises";
 import type { RawSourceMap } from "source-map-js";
 import sourceMap from "source-map-consumer";
 import { fetchFromURL, getSourceMappingURL } from "./utils.js";
-import { axiosClient } from "./axiosClient.js";
-
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import Crawler from "crawler";
@@ -15,6 +13,7 @@ import UserAgent from "user-agents";
 import { VM } from "vm2";
 import logger from "./logger.js";
 import pMap from "p-map";
+import { agent, cookieJar, gotClient } from "./http";
 
 const userAgent = new UserAgent({ deviceCategory: "desktop" });
 const { JSDOM } = jsdom;
@@ -52,11 +51,13 @@ const args = yargs(hideBin(process.argv))
   .parseSync();
 const headers = {
   accept:
-    "*/*,text/html,application/xhtml+xml,application/xml;q=0.9,application/json,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
   "accept-language": "en",
   "cache-control": "max-age=0",
+  priority: "u=0, i",
+  referer: "https://www.google.com/",
   "sec-ch-ua":
-    '"Chromium";v="110", "Not A(Brand";v="24", "Google Chrome";v="110"',
+    '"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"',
   "sec-ch-ua-mobile": "?0",
   "sec-ch-ua-platform": '"macOS"',
   "sec-fetch-dest": "document",
@@ -170,11 +171,11 @@ const parseSourceMap = async (
 
 const getJsFilesFromManifest = async (url: string) => {
   try {
-    const resp = await axiosClient.get(url, {
-      baseURL: baseUrl.origin,
+    const newUrl = new URL(url, baseUrl.origin);
+    const resp = await gotClient(newUrl, {
       headers,
     });
-    const { data, request } = resp;
+    const { body: data, requestUrl } = resp;
     const newVm = new VM({ eval: false, wasm: false, allowAsync: false });
     newVm.run(`const self = {};`);
     newVm.run(data);
@@ -185,7 +186,7 @@ const getJsFilesFromManifest = async (url: string) => {
     const strValues = values.filter((v) => typeof v === "string") as string[];
     const jsFiles = strValues.filter((v) => v.endsWith(".js"));
     const uniqueFiles = [...new Set(jsFiles)];
-    const parsedUrl = new URL(request.path, BASE_URL);
+    const parsedUrl = new URL(requestUrl, BASE_URL);
     const splitPath = parsedUrl.pathname.split("/");
     return uniqueFiles.map((l) => {
       if (l.startsWith("/")) {
@@ -216,26 +217,33 @@ const getFallbackUrl = (url: string) => {
   return parsedUrl.href;
 };
 const fetchAndParseJsFile = async (url: string) => {
-  const { data } = await axiosClient.get(url, { headers });
+  const { body: data } = await gotClient(url, { headers, agent });
   const { sourceMappingURL } = getSourceMappingURL(data);
   if (args.verbose && sourceMappingURL) {
     logger.info(`Found source map url: ${sourceMappingURL}`);
   }
-  const urlWithFallback = sourceMappingURL || getFallbackUrl(url);
-  if (urlWithFallback) {
-    const { sourceContent } = await fetchFromURL(urlWithFallback, url, headers);
-    if (sourceContent && sourceContent[0] !== "<") {
-      args.verbose &&
-        logger.info(`Found source map content: ${urlWithFallback}`);
-      await parseSourceMap(sourceContent, url, args.urlPathBasedSaving);
-      return;
+  const toCheck = [...new Set([sourceMappingURL, getFallbackUrl(url)])].filter(
+    Boolean,
+  );
+  for (const u of toCheck) {
+    try {
+      if (u) {
+        const { sourceContent } = await fetchFromURL(u, url, headers);
+        if (sourceContent && sourceContent[0] !== "<") {
+          args.verbose && logger.info(`Found source map content: ${u}`);
+          await parseSourceMap(sourceContent, url, args.urlPathBasedSaving);
+        } else {
+          args.verbose && logger.info(`No source map content for: ${u}`);
+        }
+      }
+    } catch {
+      // pass
     }
-    args.verbose &&
-      logger.info(`No source map content for: ${urlWithFallback}`);
   }
 };
 const sourcesSeen = new Set<string>();
 const jsRegex = /(?<=")([^"]+\.js)(?=")/gi;
+
 const run = async (baseUrl: string) => {
   const srcList: string[] = [];
   const parsedUrl = new URL(baseUrl);
@@ -243,8 +251,8 @@ const run = async (baseUrl: string) => {
     srcList.push(baseUrl);
   } else {
     try {
-      const resp = await axiosClient.get(baseUrl, { headers });
-      const { data, request } = resp;
+      const resp = await gotClient(baseUrl, { headers, agent, http2: true });
+      const { body: data, requestUrl } = resp;
       const virtualConsole = new jsdom.VirtualConsole();
 
       const dom = new JSDOM(data, {
@@ -252,7 +260,7 @@ const run = async (baseUrl: string) => {
         resources: "usable",
         url: baseUrl,
         pretendToBeVisual: true,
-        cookieJar: axiosClient.defaults.jar,
+        cookieJar,
         userAgent: headers["user-agent"],
         virtualConsole,
       });
@@ -260,11 +268,12 @@ const run = async (baseUrl: string) => {
         logger.error("Invalid DOM");
       } else {
         const links = dom.window.document.querySelectorAll("script");
+        const protocol = new URL(requestUrl).protocol || "https:";
         links.forEach((l) => {
           const src = l.src;
           if (src) {
             if (src.startsWith("//")) {
-              srcList.push(`${request?.protocol || "https:"}${src}`);
+              srcList.push(`${protocol}${src}`);
             } else {
               srcList.push(src);
             }
@@ -280,7 +289,7 @@ const run = async (baseUrl: string) => {
             const url = new URL(href, baseUrl);
             if (url.pathname.endsWith(".js")) {
               if (href.startsWith("//")) {
-                srcList.push(`${request?.protocol || "https:"}${href}`);
+                srcList.push(`${protocol}${href}`);
               } else {
                 srcList.push(href);
               }
@@ -366,7 +375,7 @@ if (args.crawl) {
     maxConnections: 10,
     headers,
     // This will be called for each crawled page
-    callback(error, res, done) {
+    callback(error, res, done: any) {
       if (error) {
         return done();
       }
@@ -394,7 +403,7 @@ if (args.crawl) {
         if (!urls.has(u)) {
           urls.add(u);
           promises.push(run(u));
-          c.queue(u);
+          c.add(u);
         }
       });
       const uri = res?.options?.uri;
@@ -413,7 +422,7 @@ if (args.crawl) {
   });
 
   // Queue just one URL, with default callback
-  c.queue(BASE_URL);
+  c.add(BASE_URL);
 } else {
-  run(BASE_URL);
+  await run(BASE_URL);
 }

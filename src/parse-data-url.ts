@@ -1,5 +1,3 @@
-import { atob } from "abab";
-
 const removeLeadingAndTrailingHTTPWhitespace = (string) =>
   string.replace(/^[ \t\n\r]+/, "").replace(/[ \t\n\r]+$/, "");
 
@@ -21,10 +19,8 @@ const asciiLowercase = (string) =>
 const collectAnHTTPQuotedString = (input, position) => {
   let value = "";
 
-  // eslint-disable-next-line no-param-reassign
   position += 1;
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     while (
       position < input.length &&
@@ -32,7 +28,7 @@ const collectAnHTTPQuotedString = (input, position) => {
       input[position] !== "\\"
     ) {
       value += input[position];
-      // eslint-disable-next-line no-param-reassign
+
       position += 1;
     }
 
@@ -42,7 +38,6 @@ const collectAnHTTPQuotedString = (input, position) => {
 
     const quoteOrBackslash = input[position];
 
-    // eslint-disable-next-line no-param-reassign
     position += 1;
 
     if (quoteOrBackslash === "\\") {
@@ -52,7 +47,7 @@ const collectAnHTTPQuotedString = (input, position) => {
       }
 
       value += input[position];
-      // eslint-disable-next-line no-param-reassign
+
       position += 1;
     } else {
       break;
@@ -87,7 +82,7 @@ function percentDecodeBytes(input) {
     } else {
       output[outputIndex] = parseInt(
         String.fromCodePoint(input[i + 1], input[i + 2]),
-        16
+        16,
       );
       i += 2;
     }
@@ -140,12 +135,12 @@ export default function parseDataUrl(stringInput) {
 
   // Can't use /i regexp flag because it isn't restricted to ASCII.
   const mimeTypeBase64MatchResult = /(.*); *[Bb][Aa][Ss][Ee]64$/.exec(
-    mediaType
+    mediaType,
   );
 
   if (mimeTypeBase64MatchResult) {
     const stringBody = body.toString("binary");
-    const asString = atob(stringBody);
+    const asString = Buffer.from(stringBody, "base64").toString("binary");
 
     if (asString === null) {
       return null;
@@ -161,9 +156,8 @@ export default function parseDataUrl(stringInput) {
   }
 
   const result = {
-    // eslint-disable-next-line no-undefined
     type: undefined,
-    // eslint-disable-next-line no-undefined
+
     subtype: undefined,
     parameters: new Map(),
     isBase64: Boolean(mimeTypeBase64MatchResult),
@@ -240,7 +234,6 @@ export default function parseDataUrl(stringInput) {
 
     if (positionMediaType < inputMediaType.length) {
       if (inputMediaType[positionMediaType] === ";") {
-        // eslint-disable-next-line no-continue
         continue;
       }
 
@@ -253,7 +246,7 @@ export default function parseDataUrl(stringInput) {
     if (inputMediaType[positionMediaType] === '"') {
       [parameterValue, positionMediaType] = collectAnHTTPQuotedString(
         inputMediaType,
-        positionMediaType
+        positionMediaType,
       );
 
       while (
@@ -274,7 +267,6 @@ export default function parseDataUrl(stringInput) {
       parameterValue = removeTrailingHTTPWhitespace(parameterValue);
 
       if (parameterValue === "") {
-        // eslint-disable-next-line no-continue
         continue;
       }
     }
