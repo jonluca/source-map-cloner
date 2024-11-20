@@ -433,6 +433,11 @@ if (args.crawl) {
         urls.add(uri);
         promises.push(run(uri));
       }
+      const url = res?.options?.url;
+      if (url && !urls.has(url)) {
+        urls.add(url);
+        promises.push(run(url));
+      }
       done();
     },
   });

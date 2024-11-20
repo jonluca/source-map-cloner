@@ -3,11 +3,9 @@ import prettierPlugin from "eslint-plugin-prettier";
 import unusedImportsPlugin from "eslint-plugin-unused-imports";
 import prettierExtends from "eslint-config-prettier";
 import { fixupPluginRules } from "@eslint/compat";
-import { FlatCompat } from "@eslint/eslintrc";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-const compat = new FlatCompat();
 const globalToUse = {
   ...globals.browser,
   ...globals.serviceworker,
