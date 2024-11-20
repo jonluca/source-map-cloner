@@ -17,7 +17,8 @@
     "baseUrl": ".",
     "incremental": true,
     "downlevelIteration": true,
-    "checkJs": false
+    "declaration": true,
+    "checkJs": true
   },
   "include": ["src/**/*.ts", "src/types/*.d.ts"]
 }

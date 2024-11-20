@@ -4,12 +4,12 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "source-map-cloner": "dist/index.js"
+    "source-map-cloner": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
-    "type-check": "tsc --noEmit",
-    "fetch-source": "yarn tsx src/index.ts"
+    "typecheck": "tsc --noEmit",
+    "fetch-source": "yarn tsx src/cli.ts"
   },
   "files": [
     "tsconfig.json",
