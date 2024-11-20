@@ -19,7 +19,7 @@ const userAgent = new UserAgent({ deviceCategory: "desktop" });
 const { JSDOM } = jsdom;
 const { SourceMapConsumer } = sourceMap;
 
-const fileExists = async (path: string) => {
+const doesFileExists = async (path: string) => {
   try {
     await fs.access(path);
     return true;
@@ -29,7 +29,14 @@ const fileExists = async (path: string) => {
 };
 const args = yargs(hideBin(process.argv))
   .options({
-    url: { type: "string", alias: "u", demandOption: true },
+    url: {
+      type: "string",
+      alias: "u",
+      demandOption: true,
+      array: true,
+      description:
+        "URL(s) to process. Can be provided multiple times (-u url1 -u url2) or as an array",
+    },
     dir: { type: "string", alias: "d" },
     urlPathBasedSaving: {
       type: "boolean",
@@ -43,6 +50,7 @@ const args = yargs(hideBin(process.argv))
       type: "string",
       alias: "H",
       default: [],
+      array: true,
       description:
         'HTTP Headers to send, in the format "HeaderName: HeaderValue"',
     },
@@ -73,7 +81,7 @@ if (args.headers) {
     headers[key] = value;
   }
 }
-const BASE_URL = args.url;
+const BASE_URL = args.url[0];
 try {
   new URL(BASE_URL);
 } catch (e) {
@@ -148,10 +156,24 @@ const parseSourceMap = async (
       if (pathParsed.dir) {
         mkdirp.sync(pathParsed.dir);
       }
-      if (args.verbose && (await fileExists(joined))) {
-        logger.warn(`${joined} path exists, overwriting`);
-      }
+
       const sourceCode = parsed.sourcesContent?.[index] || "";
+
+      // Check if file exists first
+      const fileExists = await doesFileExists(joined);
+
+      if (fileExists) {
+        const contents = await fs.readFile(joined, "utf-8");
+        if (sourceCode === contents) {
+          continue;
+        }
+        if (args.verbose) {
+          logger.warn(
+            `${joined} path exists but with different content overwriting`,
+          );
+        }
+      }
+
       if (args.verbose && !sourceCode) {
         logger.warn(`No source code for ${value}`);
       }
@@ -422,7 +444,11 @@ if (args.crawl) {
   });
 
   // Queue just one URL, with default callback
-  c.add(BASE_URL);
+  for (const url of args.url) {
+    c.add(url);
+  }
 } else {
-  await run(BASE_URL);
+  for (const url of args.url) {
+    await run(url);
+  }
 }
