@@ -49,15 +49,15 @@ export interface CloneResult {
  * Fetch function interface for HTTP requests
  */
 export type FetchFunction = (
-    url: string,
-    options?: {
-      headers?: Record<string, string>;
-    },
-  ) => Promise<{
-    body: string;
-    statusCode: number;
-    requestUrl: string;
-  }>;
+  url: string,
+  options?: {
+    headers?: Record<string, string>;
+  },
+) => Promise<{
+  body: string;
+  statusCode: number;
+  requestUrl: string;
+}>;
 
 /**
  * Options for source map cloning

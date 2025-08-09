@@ -23,7 +23,7 @@ const sourceMappingURLRegex = RegExp(
 function getSourceMappingURL(code: string) {
   const lines = code.split(/^/m).filter(Boolean).reverse();
   const matched = lines.find((line) => sourceMappingURLRegex.exec(line));
-  const match = matched ? (sourceMappingURLRegex.exec(matched)) : null;
+  const match = matched ? sourceMappingURLRegex.exec(matched) : null;
   const sourceMappingURL = match ? match[1] || match[2] || "" : null;
 
   return {

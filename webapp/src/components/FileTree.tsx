@@ -38,8 +38,12 @@ export function FileTree({ data, onFileSelect, searchQuery = "", isFullscreen = 
   const sortNodes = (nodes: TreeNode[]): TreeNode[] => {
     return [...nodes].sort((a, b) => {
       // Directories come first
-      if (a.type === "directory" && b.type === "file") {return -1;}
-      if (a.type === "file" && b.type === "directory") {return 1;}
+      if (a.type === "directory" && b.type === "file") {
+        return -1;
+      }
+      if (a.type === "file" && b.type === "directory") {
+        return 1;
+      }
       // Then sort alphabetically
       return a.name.localeCompare(b.name);
     });
@@ -48,32 +52,31 @@ export function FileTree({ data, onFileSelect, searchQuery = "", isFullscreen = 
   // Filter nodes based on search query
   const filterNodes = (node: TreeNode): TreeNode | null => {
     const query = searchQuery.toLowerCase();
-    
-    if (!query) {return node;}
-    
+
+    if (!query) {
+      return node;
+    }
+
     if (node.type === "file") {
       // Check if file name or path matches
-      if (node.name.toLowerCase().includes(query) || 
-          (node.path?.toLowerCase().includes(query))) {
+      if (node.name.toLowerCase().includes(query) || node.path?.toLowerCase().includes(query)) {
         return node;
       }
       return null;
     }
-    
+
     // For directories, check children
     if (node.children) {
-      const filteredChildren = node.children
-        .map(child => filterNodes(child))
-        .filter(child => child !== null);
-      
+      const filteredChildren = node.children.map((child) => filterNodes(child)).filter((child) => child !== null);
+
       if (filteredChildren.length > 0) {
         return {
           ...node,
-          children: filteredChildren
+          children: filteredChildren,
         };
       }
     }
-    
+
     return null;
   };
 
@@ -84,18 +87,18 @@ export function FileTree({ data, onFileSelect, searchQuery = "", isFullscreen = 
       const expandAll = (node: TreeNode, path = ""): string[] => {
         const currentPath = path ? `${path}/${node.name}` : node.name;
         const paths: string[] = [];
-        
+
         if (node.type === "directory" && node.children) {
           paths.push(currentPath);
-          node.children.forEach(child => {
+          node.children.forEach((child) => {
             paths.push(...expandAll(child, currentPath));
           });
         }
-        
+
         return paths;
       };
-      
-      const allPaths = data.children ? data.children.flatMap(child => expandAll(child)) : [];
+
+      const allPaths = data.children ? data.children.flatMap((child) => expandAll(child)) : [];
       setExpandedNodes(new Set(allPaths));
     }
   }, [searchQuery, data]);
@@ -103,7 +106,9 @@ export function FileTree({ data, onFileSelect, searchQuery = "", isFullscreen = 
   const renderNode = (node: TreeNode, path = "", depth = 0) => {
     // Apply filter
     const filteredNode = filterNodes(node);
-    if (searchQuery && !filteredNode) {return null;}
+    if (searchQuery && !filteredNode) {
+      return null;
+    }
     const currentPath = path ? `${path}/${node.name}` : node.name;
     const isExpanded = expandedNodes.has(currentPath);
     const isSelected = selectedPath === node.path;
@@ -158,23 +163,25 @@ export function FileTree({ data, onFileSelect, searchQuery = "", isFullscreen = 
   }
 
   const filteredData = searchQuery ? filterNodes(data) : data;
-  
+
   if (searchQuery && (!filteredData?.children || filteredData.children.length === 0)) {
     return (
-      <div className={`${isFullscreen ? "flex-1" : "h-[400px]"} w-full overflow-auto rounded-lg border border-gray-700 bg-gray-900 flex items-center justify-center`}>
-        <div className="text-gray-400 text-center">
+      <div
+        className={`${isFullscreen ? "flex-1" : "h-[400px]"} flex w-full items-center justify-center overflow-auto rounded-lg border border-gray-700 bg-gray-900`}
+      >
+        <div className="text-center text-gray-400">
           <p>No files matching "{searchQuery}"</p>
-          <p className="text-sm mt-2">Try a different search term</p>
+          <p className="mt-2 text-sm">Try a different search term</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`${isFullscreen ? "flex-1" : "h-[400px]"} w-full overflow-auto rounded-lg border border-gray-700 bg-gray-900`}>
-      <div className="py-2">
-        {sortNodes(filteredData?.children || []).map((child) => renderNode(child))}
-      </div>
+    <div
+      className={`${isFullscreen ? "flex-1" : "h-[400px]"} w-full overflow-auto rounded-lg border border-gray-700 bg-gray-900`}
+    >
+      <div className="py-2">{sortNodes(filteredData?.children || []).map((child) => renderNode(child))}</div>
     </div>
   );
 }

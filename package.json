@@ -3,21 +3,21 @@
   "version": "0.0.0-development",
   "license": "MIT",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "bin": "dist/cli/index.js",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "bin": "dist/src/cli/index.js",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./dist/src/index.js",
+      "types": "./dist/src/index.d.ts"
     },
     "./cli": {
-      "import": "./dist/cli/index.js",
-      "types": "./dist/cli/index.d.ts"
+      "import": "./dist/src/cli/index.js",
+      "types": "./dist/src/cli/index.d.ts"
     },
     "./fetchers": {
-      "import": "./dist/fetchers/index.js",
-      "types": "./dist/fetchers/index.d.ts"
+      "import": "./dist/src/fetchers/index.js",
+      "types": "./dist/src/fetchers/index.d.ts"
     },
     "./src/*": {
       "import": "./src/*",
