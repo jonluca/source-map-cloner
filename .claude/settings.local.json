@@ -7,7 +7,8 @@
       "Bash(mkdir:*)",
       "Bash(grep:*)",
       "Bash(mv:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": []
   }
