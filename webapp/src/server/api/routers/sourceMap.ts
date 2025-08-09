@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { fetchSourceMapFromUrl } from "~/server/sourceMapFetcher";
 import { TRPCError } from "@trpc/server";
+import { cloneSourceMaps } from "source-map-cloner";
+import { createNodeFetch } from "source-map-cloner/fetchers";
 
 export const sourceMapRouter = createTRPCRouter({
   fetchSourceMap: publicProcedure
@@ -12,14 +13,12 @@ export const sourceMapRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       try {
-        const files = await fetchSourceMapFromUrl(input.url);
+        const files = await cloneSourceMaps({
+          urls: [input.url],
+          fetch: createNodeFetch(),
+        });
 
-        return {
-          success: true,
-          files,
-          fileCount: files.length,
-          url: input.url,
-        };
+        return files;
       } catch (error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
