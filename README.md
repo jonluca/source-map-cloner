@@ -48,12 +48,12 @@ npx source-map-cloner --user-agent "MyBot 1.0" https://example.com output-dir
 #### Basic Example with Node.js Fetcher
 
 ```typescript
-import { cloneSourceMaps, createNodeFetch, createConsoleLogger } from 'source-map-cloner';
-import { createNodeFetch } from 'source-map-cloner/fetchers';
+import { cloneSourceMaps, createNodeFetch, createConsoleLogger } from "source-map-cloner";
+import { createNodeFetch } from "source-map-cloner/fetchers";
 
 async function example() {
   const result = await cloneSourceMaps({
-    urls: 'https://example.com',
+    urls: "https://example.com",
     fetch: createNodeFetch(),
     logger: createConsoleLogger(),
   });
@@ -71,33 +71,33 @@ async function example() {
 #### Advanced Example with Custom Options
 
 ```typescript
-import { cloneSourceMaps, createConsoleLogger } from 'source-map-cloner';
-import { createNodeFetch } from 'source-map-cloner/fetchers';
+import { cloneSourceMaps, createConsoleLogger } from "source-map-cloner";
+import { createNodeFetch } from "source-map-cloner/fetchers";
 
 async function advancedExample() {
   const fetch = createNodeFetch({
     headers: {
-      'User-Agent': 'MyBot/1.0',
-      'Authorization': 'Bearer token'
-    }
+      "User-Agent": "MyBot/1.0",
+      Authorization: "Bearer token",
+    },
   });
 
   const result = await cloneSourceMaps({
-    urls: ['https://example.com', 'https://another.com'],
+    urls: ["https://example.com", "https://another.com"],
     fetch,
     logger: createConsoleLogger(),
     crawl: true,
     verbose: true,
     headers: {
-      'Accept-Language': 'en-US'
-    }
+      "Accept-Language": "en-US",
+    },
   });
 
   // Handle errors
   if (result.errors.length > 0) {
-    console.error('Errors encountered:');
+    console.error("Errors encountered:");
     for (const error of result.errors) {
-      console.error(`- ${error.error} (URL: ${error.url || 'N/A'})`);
+      console.error(`- ${error.error} (URL: ${error.url || "N/A"})`);
     }
   }
 }
@@ -106,12 +106,12 @@ async function advancedExample() {
 #### Browser Usage
 
 ```typescript
-import { cloneSourceMaps, noopLogger } from 'source-map-cloner';
-import { createBrowserFetch } from 'source-map-cloner/fetchers';
+import { cloneSourceMaps, noopLogger } from "source-map-cloner";
+import { createBrowserFetch } from "source-map-cloner/fetchers";
 
 async function browserExample() {
   const result = await cloneSourceMaps({
-    urls: 'https://example.com',
+    urls: "https://example.com",
     fetch: createBrowserFetch(),
     logger: noopLogger, // Silent logger for browser environments
   });
@@ -123,8 +123,8 @@ async function browserExample() {
 #### Custom Logger Implementation
 
 ```typescript
-import { cloneSourceMaps, Logger } from 'source-map-cloner';
-import { createNodeFetch } from 'source-map-cloner/fetchers';
+import { cloneSourceMaps, Logger } from "source-map-cloner";
+import { createNodeFetch } from "source-map-cloner/fetchers";
 
 const customLogger: Logger = {
   info: (msg) => console.log(`[INFO] ${msg}`),
@@ -134,7 +134,7 @@ const customLogger: Logger = {
 };
 
 const result = await cloneSourceMaps({
-  urls: 'https://example.com',
+  urls: "https://example.com",
   fetch: createNodeFetch(),
   logger: customLogger,
 });
@@ -145,7 +145,7 @@ const result = await cloneSourceMaps({
 The `createNodeFetch` function creates a Node.js-compatible fetcher using the `got` library with sensible defaults:
 
 ```typescript
-import { createNodeFetch } from 'source-map-cloner/fetchers';
+import { createNodeFetch } from "source-map-cloner/fetchers";
 
 // Basic usage with default options
 const fetch = createNodeFetch();
@@ -153,9 +153,9 @@ const fetch = createNodeFetch();
 // With custom headers
 const fetchWithAuth = createNodeFetch({
   headers: {
-    'Authorization': 'Bearer token',
-    'User-Agent': 'MyApp/1.0'
-  }
+    Authorization: "Bearer token",
+    "User-Agent": "MyApp/1.0",
+  },
 });
 
 // The fetcher automatically handles:
@@ -175,10 +175,12 @@ const fetchWithAuth = createNodeFetch({
 Main function to clone source maps from URLs.
 
 **Options:**
+
 - `urls`: Single URL string or array of URLs to process
 - `fetch`: Fetch function for HTTP requests (use `createNodeFetch()` or `createBrowserFetch()`)
 - `logger?`: Optional logger instance (defaults to no-op logger)
 - `crawl?`: Enable crawling to discover linked pages
+- `cleanupKnownInvalidFiles?`: Remove known invalid files
 - `headers?`: Additional HTTP headers
 - `verbose?`: Enable verbose logging
 
@@ -191,6 +193,7 @@ Main function to clone source maps from URLs.
 Creates a Node.js-compatible fetch function using `got`.
 
 **Options:**
+
 - `headers?`: Default headers to include with all requests
 
 #### `createBrowserFetch()`
@@ -211,7 +214,7 @@ A silent logger that discards all output (useful for production or browser envir
 
 ```typescript
 interface CloneResult {
-  files: Map<string, string>;  // Map of file paths to contents
+  files: Map<string, string>; // Map of file paths to contents
   stats: {
     totalFiles: number;
     totalSize: number;
@@ -233,7 +236,10 @@ interface Logger {
 }
 
 interface FetchFunction {
-  (url: string, options?: { headers?: Record<string, string> }): Promise<{
+  (
+    url: string,
+    options?: { headers?: Record<string, string> },
+  ): Promise<{
     body: string;
     statusCode: number;
     requestUrl: string;
@@ -250,6 +256,7 @@ interface FetchFunction {
 5. **File Creation**: Returns a map of file paths to their contents
 
 The tool handles various source map formats:
+
 - External source map files (`//# sourceMappingURL=...`)
 - Inline data URLs
 - Next.js build manifests (`_buildManifest.js`)

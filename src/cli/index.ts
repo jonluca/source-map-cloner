@@ -80,6 +80,12 @@ const args = yargs(hideBin(process.argv))
       default: false,
       description: "Show what files would be written without actually writing them",
     },
+    cleanupKnownInvalidFiles: {
+      type: "boolean",
+      default: true,
+      description: "Remove known invalid files from the output directory",
+      alias: "clean",
+    },
   })
   .example([
     ["$0 -u https://example.com", "Clone source maps from a single URL"],
@@ -143,6 +149,7 @@ const options: CloneOptions = {
   crawl: args.crawl,
   headers,
   verbose: args.verbose,
+  cleanupKnownInvalidFiles: args.cleanupKnownInvalidFiles,
 };
 
 // Display configuration if verbose
