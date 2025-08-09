@@ -1,6 +1,6 @@
 import jsdom from "jsdom";
 import { VM } from "vm2";
-import type { SourceMapClonerOptions } from "../core/types.js";
+import type { SourceMapClonerOptions } from "../core/types";
 
 const { JSDOM } = jsdom;
 

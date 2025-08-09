@@ -1,8 +1,8 @@
 import type { RawSourceMap } from "source-map";
 import sourceMap from "source-map";
-import { SourceMapParseError } from "../utils/errors.js";
-import { getOutputPath } from "../utils/paths.js";
-import type { SourceMapClonerOptions, SourceFile } from "../core/types.js";
+import { SourceMapParseError } from "../utils/errors";
+import { getOutputPath } from "../utils/paths";
+import type { SourceMapClonerOptions, SourceFile } from "../core/types";
 
 const { SourceMapConsumer } = sourceMap;
 

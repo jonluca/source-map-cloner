@@ -5,9 +5,9 @@ import { mkdirp } from "mkdirp";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import UserAgent from "user-agents";
-import { cloneSourceMaps, type CloneOptions, type CloneResult } from "../core/processor.js";
-import { createNodeFetch } from "../fetchers/node.js";
-import { InvalidURLError, formatError } from "../utils/errors.js";
+import { cloneSourceMaps, type CloneOptions, type CloneResult } from "../core/processor";
+import { createNodeFetch } from "../fetchers";
+import { InvalidURLError, formatError } from "../utils/errors";
 import { createConsoleLogger } from "../utils/default-logger";
 
 const logger = createConsoleLogger();

@@ -12,6 +12,7 @@
     "outDir": "dist",
     "noImplicitAny": true,
     "experimentalDecorators": true,
+    "allowImportingTsExtensions": true,
     "emitDecoratorMetadata": true,
     "isolatedModules": true,
     "baseUrl": ".",

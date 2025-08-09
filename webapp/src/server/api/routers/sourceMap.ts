@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { TRPCError } from "@trpc/server";
-import { cloneSourceMaps } from "source-map-cloner/src/index.js";
-import { createNodeFetch } from "source-map-cloner/src/fetchers/node.js";
+import { cloneSourceMaps } from "source-map-cloner/src/index.ts";
+import { createNodeFetch } from "source-map-cloner/src/fetchers/index.ts";
 
 export const sourceMapRouter = createTRPCRouter({
   fetchSourceMap: publicProcedure

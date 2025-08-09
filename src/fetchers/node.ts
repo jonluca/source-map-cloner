@@ -1,6 +1,6 @@
-import { gotClient, agent } from "./http-client.js";
-import { HTTPError } from "../utils/errors.js";
-import type { FetchFunction } from "../core/types.js";
+import { gotClient, agent } from "./http-client";
+import { HTTPError } from "../utils/errors";
+import type { FetchFunction } from "../core/types";
 
 /**
  * Create a fetch function using Got for Node.js environments
