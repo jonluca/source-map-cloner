@@ -9,6 +9,7 @@ Source Map Cloner is a tool that fetches source maps from websites and recreates
 ## Development Commands
 
 ### Build and Type Checking
+
 ```bash
 # Build the TypeScript project
 npm run build
@@ -18,6 +19,7 @@ npm run typecheck
 ```
 
 ### Running the Tool
+
 ```bash
 # Run the CLI tool with tsx (development)
 npm run fetch-source -- <url> [directory]
@@ -46,7 +48,7 @@ node dist/cli.js --crawl <url> [directory]
    - `fetchAndWriteSourcesForUrl`: Main function that processes a URL
    - Extracts JavaScript files from HTML using jsdom
    - Parses source maps using source-map-consumer
-   - Handles Next.js build manifests (_buildManifest.js)
+   - Handles Next.js build manifests (\_buildManifest.js)
    - Writes extracted source files to disk maintaining directory structure
 
 3. **HTTP Client** (`src/http.ts`)

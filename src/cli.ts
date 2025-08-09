@@ -1,22 +1,35 @@
 #! /usr/bin/env node
-import logger from "./logger";
-import Crawler from "crawler";
+import path from "path";
+import fs from "fs/promises";
+import { mkdirp } from "mkdirp";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import type { SourceMapClonerOptions } from "./index";
-import { fetchAndWriteSourcesForUrl } from "./index";
 import UserAgent from "user-agents";
-import path from "path";
+import {
+  cloneSourceMaps,
+  type CloneOptions,
+  type CloneResult,
+} from "./index.js";
+import { createNodeFetch } from "./node-fetch.js";
+import { InvalidURLError, formatError } from "./errors.js";
+import logger from "./logger.js";
 
-process.on("uncaughtException", function (err) {
+// Setup global error handlers
+process.on("uncaughtException", (err) => {
   const isJsdomError =
     err.stack?.includes("jsdom") || err.stack?.includes("at https://");
-  if (isJsdomError) {
-    logger.error(err);
-    return;
+  if (!isJsdomError) {
+    logger.error(`Uncaught exception: ${formatError(err)}`);
+    process.exit(1);
   }
-  return;
 });
+
+process.on("unhandledRejection", (reason) => {
+  logger.error(`Unhandled rejection: ${formatError(reason)}`);
+  process.exit(1);
+});
+
+// Parse command line arguments
 const args = yargs(hideBin(process.argv))
   .options({
     url: {
@@ -27,15 +40,18 @@ const args = yargs(hideBin(process.argv))
       description:
         "URL(s) to process. Can be provided multiple times (-u url1 -u url2) or as an array",
     },
-    dir: { type: "string", alias: "d" },
-    urlPathBasedSaving: {
-      type: "boolean",
-      demandOption: false,
-      alias: "p",
+    dir: {
+      type: "string",
+      alias: "d",
       description:
-        "Include the path in the url in the directory structure (warning, might create duplicate files)",
+        "Output directory for extracted files (defaults to hostname)",
     },
-    crawl: { type: "boolean", alias: "c", default: false },
+    crawl: {
+      type: "boolean",
+      alias: "c",
+      default: false,
+      description: "Enable crawling to discover and process linked pages",
+    },
     headers: {
       type: "string",
       alias: "H",
@@ -43,14 +59,66 @@ const args = yargs(hideBin(process.argv))
       array: true,
       description:
         'HTTP Headers to send, in the format "HeaderName: HeaderValue"',
+      coerce: (headers: string[]) => {
+        const parsed: Record<string, string> = {};
+        for (const header of headers) {
+          const colonIndex = header.indexOf(":");
+          if (colonIndex === -1) {
+            throw new Error(
+              `Invalid header format: ${header}. Expected "HeaderName: HeaderValue"`,
+            );
+          }
+          const key = header.substring(0, colonIndex).trim();
+          const value = header.substring(colonIndex + 1).trim();
+          if (!key || !value) {
+            throw new Error(
+              `Invalid header format: ${header}. Both name and value are required`,
+            );
+          }
+          parsed[key] = value;
+        }
+        return parsed;
+      },
     },
-    verbose: { type: "boolean", alias: "v", default: false },
+    verbose: {
+      type: "boolean",
+      alias: "v",
+      default: false,
+      description: "Enable verbose logging for debugging",
+    },
+    dryRun: {
+      type: "boolean",
+      default: false,
+      description:
+        "Show what files would be written without actually writing them",
+    },
   })
+  .example([
+    ["$0 -u https://example.com", "Clone source maps from a single URL"],
+    ["$0 -u https://example.com -d ./output", "Specify output directory"],
+    [
+      "$0 -u https://example.com --crawl",
+      "Enable crawling to discover all pages",
+    ],
+    [
+      '$0 -u https://example.com -H "Authorization: Bearer token"',
+      "Add authentication header",
+    ],
+    [
+      "$0 -u https://example.com --dry-run",
+      "Preview files without writing them",
+    ],
+  ])
+  .help()
+  .alias("help", "h")
+  .version()
+  .alias("version", "V")
+  .strict()
   .parseSync();
 
+// Build default headers
 const userAgent = new UserAgent({ deviceCategory: "desktop" });
-
-const headers = {
+const defaultHeaders: Record<string, string> = {
   accept:
     "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
   "accept-language": "en",
@@ -65,104 +133,182 @@ const headers = {
   "sec-fetch-site": "none",
   "sec-fetch-user": "?1",
   "upgrade-insecure-requests": "1",
-  cookie:
-    "visid_incap_2294548=lJqMoGSlSwuwSKCFE9tneq6CbWgAAAAAQUIPAAAAAACl0lY6WA9mLBtfJ5KIvnnb; incap_ses_1001_2294548=5u+8X0RvsUO6WKtyiETkDa6CbWgAAAAAiWeRPn+w70yY2kWDoNcFvA==; csrftoken=oLhfOdwjCcosJ8MgUtPmxsIrY2bndH9M; nlbi_2294548=oeHHdAPvcBn9ZaZoMFEctgAAAAATpFPkwEpOp5qHAm5aYwTM; ajs_user_id=00000000; ajs_anonymous_id=0d506845-a8a6-41ad-a9f9-cbe7b89147f8; visid_incap_2857051=jxVdMR87TueHmjbxrlq8BseCbWgAAAAAQUIPAAAAAABWwJa9LS/BuQr/poISOLMh; nlbi_2857051=U3GfL0SkgDwkTFQ2TNSVbgAAAABZAEsQyTdHdw3ep9A7Q9TG; incap_ses_1001_2857051=f4IESZTxXjU8eqtyiETkDceCbWgAAAAAf94U85LiVnCrwkDXg5BK6w==; visid_incap_2627658=if7d+LjcQjSTUQwQMUSQUsiCbWgAAAAAQUIPAAAAAACxMfRNyBqM38VyuyXHYR7X; nlbi_2627658=IOUPc5b+2y9F/1szSeCpSgAAAAAXQf+n05bAsLH9uPA7a2wF; incap_ses_1001_2627658=Vy5bA55CeBt2e6tyiETkDciCbWgAAAAAcR1szy929VVh4rLtCIb32w==",
   "user-agent": userAgent.toString(),
 };
 
-if (args.headers) {
-  for (const header of args.headers) {
-    const [key, value] = header.split(": ");
-    headers[key] = value;
+// Merge custom headers with defaults
+const headers = { ...defaultHeaders, ...args.headers };
+
+// Determine output directory
+let outputDir: string;
+if (args.dir) {
+  outputDir = args.dir;
+} else {
+  try {
+    const firstUrl = new URL(args.url[0]);
+    outputDir = firstUrl.hostname;
+  } catch {
+    outputDir = "output";
   }
 }
-const getBaseUrl = () => {
-  const BASE_URL = args.url[0];
+
+// Make output directory absolute if relative
+if (!path.isAbsolute(outputDir)) {
+  outputDir = path.join(process.cwd(), outputDir);
+}
+
+// Build options for cloning
+const options: CloneOptions = {
+  urls: args.url,
+  fetch: createNodeFetch(),
+  crawl: args.crawl,
+  headers,
+  verbose: args.verbose,
+};
+
+// Display configuration if verbose
+if (args.verbose) {
+  logger.info("Configuration:");
+  logger.info(`  URLs: ${args.url.join(", ")}`);
+  logger.info(`  Output directory: ${outputDir}`);
+  logger.info(`  Crawling: ${args.crawl ? "enabled" : "disabled"}`);
+  logger.info(
+    `  Custom headers: ${Object.keys(args.headers).length} configured`,
+  );
+  logger.info(`  Dry run: ${args.dryRun ? "enabled" : "disabled"}`);
+}
+
+/**
+ * Write files from the clone result to disk
+ */
+async function writeFilesToDisk(
+  result: CloneResult,
+  outputDir: string,
+  dryRun: boolean,
+): Promise<void> {
+  if (dryRun) {
+    logger.info("\n=== DRY RUN MODE - No files will be written ===\n");
+  }
+
+  let filesWritten = 0;
+  let bytesWritten = 0;
+
+  for (const [filePath, content] of result.files) {
+    const fullPath = path.join(outputDir, filePath);
+
+    if (dryRun) {
+      logger.info(`Would write: ${fullPath} (${content.length} bytes)`);
+      filesWritten++;
+      bytesWritten += content.length;
+    } else {
+      try {
+        // Create directory if needed
+        const dir = path.dirname(fullPath);
+        await mkdirp(dir);
+
+        // Write file
+        await fs.writeFile(fullPath, content, "utf-8");
+
+        if (args.verbose) {
+          logger.info(`Wrote: ${fullPath} (${content.length} bytes)`);
+        }
+
+        filesWritten++;
+        bytesWritten += content.length;
+      } catch (error) {
+        logger.error(`Failed to write ${fullPath}: ${error}`);
+      }
+    }
+  }
+
+  if (dryRun) {
+    logger.info(
+      `=== Would write ${filesWritten} files (${formatBytes(bytesWritten)}) ===`,
+    );
+  } else {
+    logger.info(`✓ Wrote ${filesWritten} files (${formatBytes(bytesWritten)})`);
+  }
+}
+
+/**
+ * Format bytes to human-readable size
+ */
+function formatBytes(bytes: number): string {
+  if (bytes === 0) {
+    return "0 B";
+  }
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+}
+
+/**
+ * Display errors from the result
+ */
+function displayErrors(result: CloneResult): void {
+  if (result.errors.length > 0) {
+    logger.warn(
+      `Encountered ${result.errors.length} errors during processing:`,
+    );
+    for (const error of result.errors) {
+      if (error.url) {
+        logger.warn(`  - URL ${error.url}: ${error.error}`);
+      } else if (error.file) {
+        logger.warn(`  - File ${error.file}: ${error.error}`);
+      } else {
+        logger.warn(`  - ${error.error}`);
+      }
+    }
+  }
+}
+
+// Start cloning process
+async function main() {
   try {
-    return new URL(BASE_URL);
-  } catch (e) {
-    logger.error("Invalid URL");
+    const startTime = Date.now();
+    logger.info(`Starting source map cloning for ${args.url.length} URL(s)...`);
+
+    // Clone source maps into memory
+    const result = await cloneSourceMaps(options);
+
+    // Display statistics
+    logger.info(`=== Extraction Complete ===`);
+    logger.info(`  Total files extracted: ${result.stats.totalFiles}`);
+    logger.info(`  Total size: ${formatBytes(result.stats.totalSize)}`);
+    logger.info(
+      `  Duration: ${((result.stats.duration || 0) / 1000).toFixed(2)}s`,
+    );
+
+    // Display errors if any
+    displayErrors(result);
+
+    // Write files to disk (or show what would be written)
+    await writeFilesToDisk(result, outputDir, args.dryRun);
+
+    const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
+    logger.info(`✓ Total execution time: ${totalDuration}s`);
+
+    if (!args.dryRun) {
+      logger.info(`✓ Output saved to: ${outputDir}`);
+    }
+
+    process.exit(result.errors.length > 0 ? 1 : 0);
+  } catch (error) {
+    if (error instanceof InvalidURLError) {
+      logger.error(`Invalid URL: ${error.message}`);
+    } else {
+      logger.error(`Failed to clone source maps: ${formatError(error)}`);
+    }
+
+    if (args.verbose && error instanceof Error) {
+      console.error("\nStack trace:");
+      console.error(error.stack);
+    }
+
     process.exit(1);
   }
-};
-const baseUrl = getBaseUrl();
-const OUT_DIR = args.dir || baseUrl.hostname;
-const CWD = process.cwd();
-
-logger.info(`Started cloning source maps of ${baseUrl}`);
-
-const options: SourceMapClonerOptions = {
-  verbose: args.verbose,
-  urlPathBasedSaving: Boolean(args.urlPathBasedSaving),
-  headers,
-  baseUrl,
-  outputDir: path.join(CWD, OUT_DIR),
-  seenSources: new Set<string>(),
-};
-
-if (args.crawl) {
-  logger.info(`Crawling ${baseUrl}`);
-
-  const urls = new Set<string>();
-  const promises: Promise<any>[] = [];
-  const c = new Crawler({
-    maxConnections: 10,
-    headers,
-    // This will be called for each crawled page
-    callback(error, res, done: any) {
-      if (error) {
-        return done();
-      }
-      if (!res.$) {
-        return done();
-      }
-      const anchorTags = res.$("a");
-      const urlsOnPage = (Array.from(anchorTags) as cheerio.TagElement[])
-        .map((l) => l.attribs?.href)
-        .filter((l) => l && (l.startsWith(baseUrl.href) || l.startsWith("/")));
-      const base = new URL(baseUrl);
-      const unique = [
-        ...new Set(
-          urlsOnPage.map((l) => {
-            const parsed = new URL(
-              l?.startsWith("/") ? `${base.origin}${l}` : l,
-            );
-            parsed.hash = "";
-            parsed.search = "";
-            return parsed.href;
-          }),
-        ),
-      ];
-      unique.forEach((u) => {
-        if (!urls.has(u)) {
-          urls.add(u);
-          promises.push(fetchAndWriteSourcesForUrl(u, options));
-          c.add(u);
-        }
-      });
-      for (const uri of [res?.options?.uri, res?.options?.url]) {
-        if (uri && !urls.has(uri)) {
-          urls.add(uri);
-          promises.push(fetchAndWriteSourcesForUrl(uri, options));
-        }
-      }
-      done();
-    },
-  });
-
-  c.on("drain", async () => {
-    await Promise.all(promises);
-    logger.info(`Finished crawling ${baseUrl}`);
-    process.exit(0);
-  });
-
-  // Queue just one URL, with default callback
-  for (const url of args.url) {
-    c.add(url);
-  }
-} else {
-  for (const url of args.url) {
-    await fetchAndWriteSourcesForUrl(url, options);
-  }
-  process.exit(0);
 }
+
+// Run the main function
+main();

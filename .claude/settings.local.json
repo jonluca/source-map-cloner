@@ -1,8 +1,6 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(npm run:*)"
-    ],
+    "allow": ["Bash(npm run:*)"],
     "deny": []
   }
 }

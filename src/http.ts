@@ -2,8 +2,12 @@ import { CookieJar } from "tough-cookie";
 import type { AgentOptions } from "http";
 import https from "https";
 import * as http from "node:http";
+import type { Got } from "got";
 import got from "got";
-export const ciphers = [
+import logger from "./logger.js";
+
+// TLS cipher configuration for better compatibility
+const TLS_CIPHERS = [
   "TLS_AES_128_GCM_SHA256",
   "TLS_AES_256_GCM_SHA384",
   "TLS_CHACHA20_POLY1305_SHA256",
@@ -22,28 +26,56 @@ export const ciphers = [
   "SSL_RSA_WITH_3DES_EDE_CBC_SHA",
 ].join(":");
 
+// HTTP client configuration
+const HTTP_TIMEOUT = 30000; // 30 seconds
+
 export const cookieJar = new CookieJar(undefined, {
   rejectPublicSuffixes: false,
 });
-const options: AgentOptions = {
+
+const agentOptions: AgentOptions = {
   keepAlive: true,
   family: 4, // default to ipv4
+  timeout: HTTP_TIMEOUT,
 } as const;
 
 const httpsAgent = new https.Agent({
-  ...options,
+  ...agentOptions,
   rejectUnauthorized: false,
-  ciphers,
+  ciphers: TLS_CIPHERS,
 });
 
-const httpAgent = new http.Agent(options);
+const httpAgent = new http.Agent(agentOptions);
 
 export const agent = {
   http: httpAgent,
   https: httpsAgent,
 };
-export const gotClient = got.extend({
+
+// Create a configured Got instance
+export const gotClient: Got = got.extend({
   agent,
   http2: true,
   cookieJar,
+  timeout: {
+    request: HTTP_TIMEOUT,
+  },
+  hooks: {
+    beforeRetry: [
+      (error, retryCount) => {
+        logger.warn(
+          `Retrying request (attempt ${retryCount}): ${error.message}`,
+        );
+      },
+    ],
+    beforeError: [
+      (error) => {
+        const { response } = error;
+        if (response) {
+          error.message = `${error.message} (status: ${response.statusCode})`;
+        }
+        return error;
+      },
+    ],
+  },
 });

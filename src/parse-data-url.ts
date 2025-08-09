@@ -1,22 +1,26 @@
-const removeLeadingAndTrailingHTTPWhitespace = (string) =>
+const removeLeadingAndTrailingHTTPWhitespace = (string: string): string =>
   string.replace(/^[ \t\n\r]+/, "").replace(/[ \t\n\r]+$/, "");
 
-const removeTrailingHTTPWhitespace = (string) =>
+const removeTrailingHTTPWhitespace = (string: string): string =>
   string.replace(/[ \t\n\r]+$/, "");
 
-const isHTTPWhitespaceChar = (char) =>
+const isHTTPWhitespaceChar = (char: string): boolean =>
   char === " " || char === "\t" || char === "\n" || char === "\r";
 
-const solelyContainsHTTPTokenCodePoints = (string) =>
+const solelyContainsHTTPTokenCodePoints = (string: string): boolean =>
   /^[-!#$%&'*+.^_`|~A-Za-z0-9]*$/.test(string);
 
-const soleyContainsHTTPQuotedStringTokenCodePoints = (string) =>
-  /^[\t\u0020-\u007E\u0080-\u00FF]*$/.test(string);
+const soleyContainsHTTPQuotedStringTokenCodePoints = (
+  string: string,
+): boolean => /^[\t\u0020-\u007E\u0080-\u00FF]*$/.test(string);
 
-const asciiLowercase = (string) =>
-  string.replace(/[A-Z]/g, (l) => l.toLowerCase());
+const asciiLowercase = (string: string): string =>
+  string.replace(/[A-Z]/g, (l: string) => l.toLowerCase());
 
-const collectAnHTTPQuotedString = (input, position) => {
+const collectAnHTTPQuotedString = (
+  input: string,
+  position: number,
+): [string, number] => {
   let value = "";
 
   position += 1;
@@ -57,7 +61,7 @@ const collectAnHTTPQuotedString = (input, position) => {
   return [value, position];
 };
 
-function isASCIIHex(c) {
+function isASCIIHex(c: number): boolean {
   return (
     (c >= 0x30 && c <= 0x39) ||
     (c >= 0x41 && c <= 0x46) ||
@@ -65,7 +69,7 @@ function isASCIIHex(c) {
   );
 }
 
-function percentDecodeBytes(input) {
+function percentDecodeBytes(input: Uint8Array): Uint8Array {
   const output = new Uint8Array(input.byteLength);
   let outputIndex = 0;
 
@@ -93,7 +97,7 @@ function percentDecodeBytes(input) {
   return output.slice(0, outputIndex);
 }
 
-export default function parseDataUrl(stringInput) {
+export default function parseDataUrl(stringInput: string): any {
   let parsedUrl;
 
   try {
@@ -155,9 +159,8 @@ export default function parseDataUrl(stringInput) {
     mediaType = `text/plain ${mediaType}`;
   }
 
-  const result = {
+  const result: any = {
     type: undefined,
-
     subtype: undefined,
     parameters: new Map(),
     isBase64: Boolean(mimeTypeBase64MatchResult),

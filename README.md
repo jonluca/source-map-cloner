@@ -9,18 +9,22 @@ Extract and reconstruct original source files from production JavaScript source 
 - 📁 **Original Structure Preservation** - Maintains the original directory structure of source files
 - 🚀 **Concurrent Processing** - Fast parallel fetching with configurable concurrency
 - 📦 **Multiple URL Support** - Process multiple URLs in a single run
-- 🔧 **Flexible Usage** - Use as a CLI tool or Node.js library
+- 🔧 **Flexible Usage** - Use as a CLI tool or Node.js/Browser library
+- 🌐 **Isomorphic** - Works in both Node.js and browser environments
+- 💾 **In-Memory Processing** - All operations work in memory, file writing is optional
 - 🎯 **Next.js Support** - Special handling for Next.js build manifests
 - 🛡️ **Security Features** - Path traversal protection and header customization
 
 ## Installation
 
 ### Global CLI Installation
+
 ```bash
 npm install -g source-map-cloner
 ```
 
 ### As a Project Dependency
+
 ```bash
 npm install source-map-cloner
 # or
@@ -28,6 +32,7 @@ yarn add source-map-cloner
 ```
 
 ### Development Setup
+
 ```bash
 git clone https://github.com/yourusername/source-map-cloner.git
 cd source-map-cloner
@@ -40,6 +45,7 @@ yarn build
 ### CLI Usage
 
 #### Basic Usage
+
 ```bash
 # Fetch source maps from a single URL
 source-map-cloner -u https://example.com
@@ -65,115 +71,158 @@ source-map-cloner -u https://example.com --verbose
 
 #### CLI Options
 
-| Option | Alias | Description | Default |
-|--------|-------|-------------|---------|
-| `--url` | `-u` | URL(s) to process (can be specified multiple times) | Required |
-| `--dir` | `-d` | Output directory for extracted files | Site hostname |
-| `--crawl` | `-c` | Enable crawling to discover linked pages | `false` |
-| `--urlPathBasedSaving` | `-p` | Include URL path in directory structure | `false` |
-| `--headers` | `-H` | HTTP headers in "Name: Value" format | `[]` |
-| `--verbose` | `-v` | Enable verbose logging | `false` |
+| Option                 | Alias | Description                                         | Default       |
+| ---------------------- | ----- | --------------------------------------------------- | ------------- |
+| `--url`                | `-u`  | URL(s) to process (can be specified multiple times) | Required      |
+| `--dir`                | `-d`  | Output directory for extracted files                | Site hostname |
+| `--crawl`              | `-c`  | Enable crawling to discover linked pages            | `false`       |
+| `--urlPathBasedSaving` | `-p`  | Include URL path in directory structure             | `false`       |
+| `--headers`            | `-H`  | HTTP headers in "Name: Value" format                | `[]`          |
+| `--verbose`            | `-v`  | Enable verbose logging                              | `false`       |
 
 ### Library Usage
 
-#### Basic Example
+#### Basic Example (Node.js)
+
 ```javascript
-import cloneSourceMaps from 'source-map-cloner';
+import cloneSourceMaps from "source-map-cloner";
+import { createNodeFetch } from "source-map-cloner/node-fetch";
 
-// Simple usage
-await cloneSourceMaps({
-  urls: 'https://example.com',
-  outputDir: './extracted-sources'
-});
-
-// Multiple URLs with options
-await cloneSourceMaps({
-  urls: ['https://example.com', 'https://example.com/app'],
-  outputDir: './output',
-  crawl: true,
+// Extract source maps into memory
+const result = await cloneSourceMaps({
+  urls: "https://example.com",
+  fetch: createNodeFetch(), // Required: provide fetch implementation
   verbose: true,
-  headers: {
-    'Authorization': 'Bearer token',
-    'User-Agent': 'Custom Agent'
-  }
 });
+
+// Access extracted files
+console.log(`Extracted ${result.stats.totalFiles} files`);
+for (const [path, content] of result.files) {
+  console.log(`File: ${path}, Size: ${content.length} bytes`);
+}
+
+// Write files to disk
+import fs from "fs/promises";
+import path from "path";
+for (const [filePath, content] of result.files) {
+  const fullPath = path.join("./output", filePath);
+  await fs.writeFile(fullPath, content);
+}
 ```
 
 #### TypeScript Support
+
 ```typescript
-import cloneSourceMaps, { 
-  CloneOptions, 
-  SourceMapClonerOptions,
-  fetchAndWriteSourcesForUrl 
-} from 'source-map-cloner';
+import cloneSourceMaps, {
+  CloneOptions,
+  CloneResult,
+  FetchFunction,
+} from "source-map-cloner";
+import { createNodeFetch } from "source-map-cloner/node-fetch";
 
 const options: CloneOptions = {
-  urls: 'https://example.com',
-  outputDir: './output',
+  urls: "https://example.com",
+  fetch: createNodeFetch(), // Required: provide fetch implementation
   crawl: false,
   urlPathBasedSaving: true,
   verbose: true,
   headers: {
-    'Cookie': 'session=abc123'
-  }
+    Cookie: "session=abc123",
+  },
 };
 
-try {
-  await cloneSourceMaps(options);
-  console.log('Source maps extracted successfully!');
-} catch (error) {
-  console.error('Extraction failed:', error);
+const result: CloneResult = await cloneSourceMaps(options);
+
+// Access results
+result.files.forEach((content, path) => {
+  console.log(`${path}: ${content.length} bytes`);
+});
+
+// Check for errors
+if (result.errors.length > 0) {
+  console.error("Errors encountered:", result.errors);
 }
 ```
 
-#### Advanced Library Usage
-```javascript
-import { fetchAndWriteSourcesForUrl } from 'source-map-cloner';
+#### Browser Usage
 
-// Use the lower-level API for custom workflows
-const options = {
-  verbose: true,
-  urlPathBasedSaving: false,
-  headers: { 'User-Agent': 'Custom Bot' },
-  baseUrl: new URL('https://example.com'),
-  outputDir: './custom-output',
-  seenSources: new Set() // Track already processed sources
+```javascript
+import cloneSourceMaps from "source-map-cloner";
+import { createBrowserFetch } from "source-map-cloner/browser-fetch";
+
+// Provide the browser fetch implementation
+const result = await cloneSourceMaps({
+  urls: "https://example.com",
+  fetch: createBrowserFetch(), // Uses browser's native fetch API
+  verbose: false, // Logging might not work in browser
+});
+
+// Process results in browser
+console.log("Files extracted:", result.stats.totalFiles);
+// You could display files, create a zip, etc.
+
+// Alternative: Custom fetch implementation
+const customFetch = async (url, options) => {
+  const response = await fetch(url, {
+    headers: options?.headers,
+    mode: "cors",
+  });
+  return {
+    body: await response.text(),
+    statusCode: response.status,
+    requestUrl: response.url,
+  };
 };
 
-await fetchAndWriteSourcesForUrl('https://example.com/app.js', options);
+const result2 = await cloneSourceMaps({
+  urls: "https://example.com",
+  fetch: customFetch,
+});
 ```
 
 ## API Reference
 
-### `cloneSourceMaps(options: CloneOptions): Promise<void>`
+### `cloneSourceMaps(options: CloneOptions): Promise<CloneResult>`
 
-Main function to clone source maps from one or more URLs.
+Main function to clone source maps from one or more URLs. Returns all extracted files in memory.
 
 #### CloneOptions
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `urls` | `string \| string[]` | Yes | URL(s) to process |
-| `outputDir` | `string` | No | Output directory (defaults to hostname) |
-| `crawl` | `boolean` | No | Enable web crawling |
-| `urlPathBasedSaving` | `boolean` | No | Preserve URL paths in output |
-| `headers` | `Record<string, string>` | No | Custom HTTP headers |
-| `verbose` | `boolean` | No | Enable verbose logging |
+| Property             | Type                     | Required | Description                            |
+| -------------------- | ------------------------ | -------- | -------------------------------------- |
+| `urls`               | `string \| string[]`     | Yes      | URL(s) to process                      |
+| `fetch`              | `FetchFunction`          | Yes      | Fetch implementation for HTTP requests |
+| `crawl`              | `boolean`                | No       | Enable web crawling                    |
+| `urlPathBasedSaving` | `boolean`                | No       | Preserve URL paths in output           |
+| `headers`            | `Record<string, string>` | No       | Custom HTTP headers                    |
+| `verbose`            | `boolean`                | No       | Enable verbose logging                 |
 
-### `fetchAndWriteSourcesForUrl(url: string, options: SourceMapClonerOptions): Promise<void>`
+#### CloneResult
 
-Lower-level function for processing a single URL with more control.
+| Property | Type                  | Description                                        |
+| -------- | --------------------- | -------------------------------------------------- |
+| `files`  | `Map<string, string>` | Map of file paths to their contents                |
+| `stats`  | `object`              | Statistics (totalFiles, totalSize, urls, duration) |
+| `errors` | `Array`               | Array of errors encountered during processing      |
 
-#### SourceMapClonerOptions
+### `FetchFunction` Interface
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `outputDir` | `string` | Yes | Output directory path |
-| `verbose` | `boolean` | No | Enable verbose logging |
-| `urlPathBasedSaving` | `boolean` | No | Preserve URL paths |
-| `headers` | `Record<string, string>` | No | HTTP headers |
-| `baseUrl` | `URL` | No | Base URL for relative paths |
-| `seenSources` | `Set<string>` | No | Track processed sources |
+The fetch function must implement the following interface:
+
+```typescript
+interface FetchFunction {
+  (
+    url: string,
+    options?: {
+      headers?: Record<string, string>;
+    },
+  ): Promise<{
+    body: string;
+    statusCode: number;
+    requestUrl: string;
+  }>;
+}
+```
 
 ## How It Works
 
@@ -214,18 +263,20 @@ Lower-level function for processing a single URL with more control.
 The tool creates a directory structure that mirrors the original source:
 
 ```
+
 output-directory/
 ├── src/
-│   ├── components/
-│   │   ├── Header.tsx
-│   │   └── Footer.tsx
-│   ├── utils/
-│   │   └── helpers.js
-│   └── index.js
-├── node_modules/  (if included in source maps)
-│   └── ...
-└── webpack/  (webpack internals if present)
-    └── ...
+│ ├── components/
+│ │ ├── Header.tsx
+│ │ └── Footer.tsx
+│ ├── utils/
+│ │ └── helpers.js
+│ └── index.js
+├── node_modules/ (if included in source maps)
+│ └── ...
+└── webpack/ (webpack internals if present)
+└── ...
+
 ```
 
 ## Limitations
@@ -251,3 +302,7 @@ Some utilities and patterns are adapted from [webpack's source-map-loader](https
 ## Disclaimer
 
 This tool is intended for legitimate purposes such as debugging, security research, and education. Users are responsible for ensuring they have permission to access and download source maps from target websites. Always respect intellectual property rights and terms of service.
+
+```
+
+```
