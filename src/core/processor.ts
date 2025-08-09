@@ -128,7 +128,7 @@ export async function fetchAndWriteSourcesForUrl(
  */
 export async function cloneSourceMaps(options: CloneOptions): Promise<CloneResult> {
   const startTime = Date.now();
-  const urls = Array.isArray(options.urls) ? options.urls : [options.urls];
+  const urls = (Array.isArray(options.urls) ? options.urls : [options.urls]) as [string, ...string[]];
 
   if (urls.length === 0) {
     throw new Error("No URLs provided");

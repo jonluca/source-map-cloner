@@ -3,7 +3,8 @@ const removeLeadingAndTrailingHTTPWhitespace = (string: string): string =>
 
 const removeTrailingHTTPWhitespace = (string: string): string => string.replace(/[ \t\n\r]+$/, "");
 
-const isHTTPWhitespaceChar = (char: string): boolean => char === " " || char === "\t" || char === "\n" || char === "\r";
+const isHTTPWhitespaceChar = (char: string | undefined): boolean =>
+  char === " " || char === "\t" || char === "\n" || char === "\r";
 
 const solelyContainsHTTPTokenCodePoints = (string: string): boolean => /^[-!#$%&'*+.^_`|~A-Za-z0-9]*$/.test(string);
 
@@ -58,14 +59,14 @@ function percentDecodeBytes(input: Uint8Array): Uint8Array {
   let outputIndex = 0;
 
   for (let i = 0; i < input.byteLength; ++i) {
-    const byte = input[i];
+    const byte = input[i]!;
 
     if (byte !== 0x25) {
       output[outputIndex] = byte;
-    } else if (byte === 0x25 && (!isASCIIHex(input[i + 1]) || !isASCIIHex(input[i + 2]))) {
+    } else if (byte === 0x25 && (!isASCIIHex(input[i + 1]!) || !isASCIIHex(input[i + 2]!))) {
       output[outputIndex] = byte;
     } else {
-      output[outputIndex] = parseInt(String.fromCodePoint(input[i + 1], input[i + 2]), 16);
+      output[outputIndex] = parseInt(String.fromCodePoint(input[i + 1]!, input[i + 2]!), 16);
       i += 2;
     }
 
@@ -126,7 +127,9 @@ export default function parseDataUrl(stringInput: string): any {
 
     body = Buffer.from(asString, "binary");
 
-    [, mediaType] = mimeTypeBase64MatchResult;
+    if (mimeTypeBase64MatchResult[1]) {
+      mediaType = mimeTypeBase64MatchResult[1];
+    }
   }
 
   if (mediaType.startsWith(";")) {

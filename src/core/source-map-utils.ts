@@ -21,16 +21,9 @@ const sourceMappingURLRegex = RegExp(
 );
 
 function getSourceMappingURL(code: string) {
-  const lines = code.split(/^/m);
-  let match;
-
-  for (let i = lines.length - 1; i >= 0; i--) {
-    match = lines[i].match(sourceMappingURLRegex);
-    if (match) {
-      break;
-    }
-  }
-
+  const lines = code.split(/^/m).filter(Boolean).reverse();
+  const matched = lines.find((line) => line.match(sourceMappingURLRegex));
+  const match = matched ? matched.match(sourceMappingURLRegex) : null;
   const sourceMappingURL = match ? match[1] || match[2] || "" : null;
 
   return {

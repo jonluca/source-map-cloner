@@ -77,7 +77,7 @@ export interface SourceMapClonerOptions {
  * Public API options for cloning
  */
 export interface CloneOptions {
-  urls: string | string[];
+  urls: string | [string, ...string[]];
   fetch: FetchFunction;
   logger?: Logger;
   crawl?: boolean;

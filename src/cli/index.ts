@@ -123,7 +123,7 @@ if (args.dir) {
   outputDir = args.dir;
 } else {
   try {
-    const firstUrl = new URL(args.url[0]);
+    const firstUrl = new URL(args.url[0]!);
     outputDir = firstUrl.hostname;
   } catch {
     outputDir = "output";
@@ -137,7 +137,7 @@ if (!path.isAbsolute(outputDir)) {
 
 // Build options for cloning
 const options: CloneOptions = {
-  urls: args.url,
+  urls: args.url as [string, ...string[]],
   fetch: createNodeFetch(),
   logger,
   crawl: args.crawl,

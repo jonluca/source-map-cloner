@@ -43,6 +43,9 @@ export function extractSourceFiles(
 
   for (let i = 0; i < parsedMap.sources.length; i++) {
     const source = parsedMap.sources[i];
+    if (!source) {
+      continue;
+    }
     const sourceContent = parsedMap.sourcesContent[i];
 
     // Skip synthetic sources

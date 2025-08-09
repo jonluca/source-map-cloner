@@ -43,15 +43,15 @@ export const sourceMapRouter = createTRPCRouter({
     }),
 });
 
+export interface TreeNode {
+  name: string;
+  type: "file" | "directory";
+  children?: TreeNode[];
+  path?: string;
+}
+
 // Helper function to build directory structure
 function buildDirectoryStructure(files: Array<{ path: string; content: string }>) {
-  interface TreeNode {
-    name: string;
-    type: "file" | "directory";
-    children?: TreeNode[];
-    path?: string;
-  }
-
   const root: TreeNode = {
     name: "/",
     type: "directory",

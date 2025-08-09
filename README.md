@@ -243,83 +243,45 @@ interface FetchFunction {
 
 ## How It Works
 
-1. **Discovery Phase**
-   - Fetches the target URL and parses HTML content
-   - Extracts all JavaScript file references from `<script>` tags and other sources
-   - Optionally crawls linked pages to discover more JavaScript files
+1. **URL Processing**: Fetches the HTML content from provided URLs
+2. **JavaScript Discovery**: Extracts all JavaScript file references from the HTML
+3. **Source Map Detection**: Searches for source map references in JavaScript files (both inline and external)
+4. **Source Extraction**: Parses source maps and extracts original source content
+5. **File Creation**: Returns a map of file paths to their contents
 
-2. **Source Map Extraction**
-   - For each JavaScript file, looks for source map references
-   - Supports multiple source map formats:
-     - External `.map` files
-     - Inline source maps (data URLs)
-     - Source map comments in JavaScript files
+The tool handles various source map formats:
+- External source map files (`//# sourceMappingURL=...`)
+- Inline data URLs
+- Next.js build manifests (`_buildManifest.js`)
 
-3. **Source Reconstruction**
-   - Parses source maps to extract original source code
-   - Handles various source map formats (webpack, Next.js, etc.)
-   - Preserves original directory structure
+## Development
 
-4. **File Writing**
-   - Creates necessary directories
-   - Writes source files with original content
-   - Prevents directory traversal attacks
-   - Handles duplicate files intelligently
+### Building
 
-## Use Cases
-
-- **Security Research**: Analyze production applications for security vulnerabilities
-- **Debugging Production Issues**: Understand minified code behavior in production
-- **Learning**: Study how popular websites structure their applications
-- **Migration**: Understand legacy codebases when source code is unavailable
-- **Compliance**: Verify third-party code in production environments
-- **Recovery**: Reconstruct source code when original files are lost
-
-## Output Structure
-
-The tool creates a directory structure that mirrors the original source:
-
+```bash
+npm run build
 ```
 
-output-directory/
-├── src/
-│ ├── components/
-│ │ ├── Header.tsx
-│ │ └── Footer.tsx
-│ ├── utils/
-│ │ └── helpers.js
-│ └── index.js
-├── node_modules/ (if included in source maps)
-│ └── ...
-└── webpack/ (webpack internals if present)
-└── ...
+### Type Checking
 
+```bash
+npm run typecheck
 ```
 
-## Limitations
+### Running in Development
 
-- Only works with websites that include source maps in production
-- Cannot recover source code if source maps don't include source content
-- Some source maps may have incomplete or modified source content
-- Rate limiting on target servers may affect crawling speed
-- Very large sites may require significant disk space
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+```bash
+npm run fetch-source -- https://example.com output-dir
+```
 
 ## License
 
 MIT
 
-## Credits
+## Contributing
 
-Some utilities and patterns are adapted from [webpack's source-map-loader](https://github.com/webpack-contrib/source-map-loader).
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-## Disclaimer
+## Security
 
-This tool is intended for legitimate purposes such as debugging, security research, and education. Users are responsible for ensuring they have permission to access and download source maps from target websites. Always respect intellectual property rights and terms of service.
-
-```
-
-```
+This tool is designed for legitimate security research and debugging purposes. Please ensure you have permission before extracting source maps from websites you don't own.

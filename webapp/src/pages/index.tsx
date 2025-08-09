@@ -64,8 +64,8 @@ function getLanguageFromPath(path: string): string {
 export default function Home() {
   const [url, setUrl] = useState("");
   const [selectedFile, setSelectedFile] = useState<{ path: string; content: string } | null>(null);
-  const [isFileBrowserFullscreen, setIsFileBrowserFullscreen] = useState(false);
-  const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: result, isPending: isLoading, error, mutate } = api.sourceMap.fetchSourceMap.useMutation({});
 
@@ -82,8 +82,7 @@ export default function Home() {
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setIsFileBrowserFullscreen(false);
-        setIsPreviewFullscreen(false);
+        setIsFullscreen(false);
       }
     };
     window.addEventListener("keydown", handleEsc);
@@ -200,49 +199,56 @@ export default function Home() {
                     Download as ZIP
                   </button>
 
-                  <div className="mt-6">
-                    <h3 className="mb-3 text-lg font-semibold text-gray-300">File Browser:</h3>
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                      <div
-                        className={`${
-                          isFileBrowserFullscreen
-                            ? "fixed inset-0 z-50 bg-gray-900 p-4 overflow-auto"
-                            : ""
-                        }`}
+                  <div className={`mt-6 ${isFullscreen ? "fixed inset-0 z-50 bg-gray-900 p-4 overflow-hidden flex flex-col" : ""}`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-lg font-semibold text-gray-300">File Browser:</h3>
+                      <button
+                        onClick={() => setIsFullscreen(!isFullscreen)}
+                        className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-800"
+                        title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
                       >
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-sm font-medium text-gray-400">Directory Structure</h4>
-                          <button
-                            onClick={() => setIsFileBrowserFullscreen(!isFileBrowserFullscreen)}
-                            className="p-1 text-gray-400 hover:text-white transition-colors"
-                            title={isFileBrowserFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-                          >
-                            <svg
-                              className="w-5 h-5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              {isFileBrowserFullscreen ? (
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M6 18L18 6M6 6l12 12"
-                                />
-                              ) : (
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-                                />
-                              )}
-                            </svg>
-                          </button>
-                        </div>
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          {isFullscreen ? (
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          ) : (
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                            />
+                          )}
+                        </svg>
+                      </button>
+                    </div>
+                    
+                    <div className="mb-4">
+                      <input
+                        type="text"
+                        placeholder="Search files..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full rounded-lg border border-gray-600 bg-gray-800 px-4 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className={`grid grid-cols-1 gap-4 ${isFullscreen ? "flex-1 lg:grid-cols-2" : "lg:grid-cols-2"}`}>
+                      <div className={isFullscreen ? "flex flex-col h-full" : ""}>
+                        <h4 className="mb-2 text-sm font-medium text-gray-400">Directory Structure</h4>
                         <FileTree
                           data={result.directoryStructure}
+                          searchQuery={searchQuery}
+                          isFullscreen={isFullscreen}
                           onFileSelect={(path) => {
                             const file = result.files.find((f) => f.path === path);
                             if (file) {
@@ -251,51 +257,15 @@ export default function Home() {
                           }}
                         />
                       </div>
-                      <div
-                        className={`${
-                          isPreviewFullscreen
-                            ? "fixed inset-0 z-50 bg-gray-900 p-4 overflow-auto"
-                            : ""
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-sm font-medium text-gray-400">File Preview</h4>
-                          <button
-                            onClick={() => setIsPreviewFullscreen(!isPreviewFullscreen)}
-                            className="p-1 text-gray-400 hover:text-white transition-colors"
-                            title={isPreviewFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-                          >
-                            <svg
-                              className="w-5 h-5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              {isPreviewFullscreen ? (
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M6 18L18 6M6 6l12 12"
-                                />
-                              ) : (
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-                                />
-                              )}
-                            </svg>
-                          </button>
-                        </div>
+                      <div className={isFullscreen ? "flex flex-col h-full" : ""}>
+                        <h4 className="mb-2 text-sm font-medium text-gray-400">File Preview</h4>
                         {selectedFile ? (
-                          <div className="overflow-hidden rounded-lg border border-gray-700 bg-gray-900">
+                          <div className={`overflow-hidden rounded-lg border border-gray-700 bg-gray-900 ${isFullscreen ? "flex-1 flex flex-col" : ""}`}>
                             <div className="border-b border-gray-700 bg-gray-800 px-4 py-2 font-mono text-sm text-gray-400">
                               {selectedFile.path}
                             </div>
                             <MonacoEditor
-                              height={isPreviewFullscreen ? "calc(100vh - 120px)" : "400px"}
+                              height={isFullscreen ? "100%" : "400px"}
                               language={getLanguageFromPath(selectedFile.path)}
                               theme="vs-dark"
                               value={selectedFile.content}
@@ -310,7 +280,7 @@ export default function Home() {
                             />
                           </div>
                         ) : (
-                          <div className={`flex ${isPreviewFullscreen ? "h-[calc(100vh-120px)]" : "h-[400px]"} items-center justify-center rounded-lg border border-gray-700 bg-gray-900`}>
+                          <div className={`flex ${isFullscreen ? "flex-1" : "h-[400px]"} items-center justify-center rounded-lg border border-gray-700 bg-gray-900`}>
                             <p className="text-gray-500">Select a file to preview</p>
                           </div>
                         )}
