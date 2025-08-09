@@ -186,9 +186,16 @@ export default function Home() {
               {result && (
                 <div className="mt-6 space-y-4">
                   <div className="rounded-lg border border-green-500 bg-green-900/50 p-4">
-                    <p className="text-green-300">Successfully extracted {result.stats.totalFiles} source files!</p>
+                    <p className="text-green-300">
+                      Successfully extracted {result.stats.totalFiles.toLocaleString()} source files!
+                    </p>
                     <p className="mt-1 text-sm text-green-300">
-                      Total size: {(result.stats.totalSize / 1024).toFixed(2)} KB
+                      Total size:{" "}
+                      {(result.stats.totalSize / 1024).toLocaleString(undefined, {
+                        maximumFractionDigits: 2,
+                        minimumFractionDigits: 2,
+                      })}{" "}
+                      KB
                     </p>
                   </div>
 
@@ -199,20 +206,17 @@ export default function Home() {
                     Download as ZIP
                   </button>
 
-                  <div className={`mt-6 ${isFullscreen ? "fixed inset-0 z-50 bg-gray-900 p-4 overflow-hidden flex flex-col" : ""}`}>
-                    <div className="flex items-center justify-between mb-3">
+                  <div
+                    className={`mt-6 ${isFullscreen ? "fixed inset-0 z-50 flex flex-col overflow-hidden bg-gray-900 p-4" : ""}`}
+                  >
+                    <div className="mb-3 flex items-center justify-between">
                       <h3 className="text-lg font-semibold text-gray-300">File Browser:</h3>
                       <button
                         onClick={() => setIsFullscreen(!isFullscreen)}
-                        className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-800"
+                        className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
                         title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
                       >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           {isFullscreen ? (
                             <path
                               strokeLinecap="round"
@@ -231,7 +235,7 @@ export default function Home() {
                         </svg>
                       </button>
                     </div>
-                    
+
                     <div className="mb-4">
                       <input
                         type="text"
@@ -242,8 +246,10 @@ export default function Home() {
                       />
                     </div>
 
-                    <div className={`grid grid-cols-1 gap-4 ${isFullscreen ? "flex-1 lg:grid-cols-2" : "lg:grid-cols-2"}`}>
-                      <div className={isFullscreen ? "flex flex-col h-full" : ""}>
+                    <div
+                      className={`grid grid-cols-1 gap-4 ${isFullscreen ? "flex-1 lg:grid-cols-2" : "lg:grid-cols-2"}`}
+                    >
+                      <div className={isFullscreen ? "flex h-full flex-col" : ""}>
                         <h4 className="mb-2 text-sm font-medium text-gray-400">Directory Structure</h4>
                         <FileTree
                           data={result.directoryStructure}
@@ -257,10 +263,12 @@ export default function Home() {
                           }}
                         />
                       </div>
-                      <div className={isFullscreen ? "flex flex-col h-full" : ""}>
+                      <div className={isFullscreen ? "flex h-full flex-col" : ""}>
                         <h4 className="mb-2 text-sm font-medium text-gray-400">File Preview</h4>
                         {selectedFile ? (
-                          <div className={`overflow-hidden rounded-lg border border-gray-700 bg-gray-900 ${isFullscreen ? "flex-1 flex flex-col" : ""}`}>
+                          <div
+                            className={`overflow-hidden rounded-lg border border-gray-700 bg-gray-900 ${isFullscreen ? "flex flex-1 flex-col" : ""}`}
+                          >
                             <div className="border-b border-gray-700 bg-gray-800 px-4 py-2 font-mono text-sm text-gray-400">
                               {selectedFile.path}
                             </div>
@@ -280,7 +288,9 @@ export default function Home() {
                             />
                           </div>
                         ) : (
-                          <div className={`flex ${isFullscreen ? "flex-1" : "h-[400px]"} items-center justify-center rounded-lg border border-gray-700 bg-gray-900`}>
+                          <div
+                            className={`flex ${isFullscreen ? "flex-1" : "h-[400px]"} items-center justify-center rounded-lg border border-gray-700 bg-gray-900`}
+                          >
                             <p className="text-gray-500">Select a file to preview</p>
                           </div>
                         )}
