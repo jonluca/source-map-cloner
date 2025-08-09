@@ -13,6 +13,7 @@ export const sourceMapRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       try {
+        console.log("Fetching source map for URL:", input.url);
         const result = await cloneSourceMaps({
           urls: [input.url],
           fetch: createNodeFetch(),
