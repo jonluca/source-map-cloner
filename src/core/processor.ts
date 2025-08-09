@@ -139,8 +139,8 @@ const defaultHeaders = {
   "sec-fetch-site": "none",
   "sec-fetch-user": "?1",
   "upgrade-insecure-requests": "1",
-  "user-agent": userAgent,
-};
+  "user-agent": userAgent!,
+} as CloneOptions["headers"];
 
 /**
  * Clone source maps from one or more URLs and return results in memory
