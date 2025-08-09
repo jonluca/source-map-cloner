@@ -1,9 +1,8 @@
 import type { RawSourceMap } from "source-map-js";
 import sourceMap from "source-map";
-import { SourceMapParseError } from "./errors.js";
-import { getOutputPath } from "./path-utils.js";
-import logger from "./logger.js";
-import type { SourceMapClonerOptions, SourceFile } from "./types.js";
+import { SourceMapParseError } from "../utils/errors.js";
+import { getOutputPath } from "../utils/paths.js";
+import type { SourceMapClonerOptions, SourceFile } from "../core/types.js";
 
 const { SourceMapConsumer } = sourceMap;
 
@@ -58,7 +57,7 @@ export function extractSourceFiles(
 
     if (!sourceContent) {
       if (options.verbose) {
-        logger.warn(`No source content for ${source}`);
+        options.logger.warn(`No source content for ${source}`);
       }
       continue;
     }
@@ -75,10 +74,10 @@ export function extractSourceFiles(
       });
 
       if (options.verbose) {
-        logger.info(`Extracted source: ${outputPath}`);
+        options.logger.info(`Extracted source: ${outputPath}`);
       }
     } catch (error) {
-      logger.error(`Error processing source ${source}: ${error}`);
+      options.logger.error(`Error processing source ${source}: ${error}`);
       if (options.verbose) {
         console.error(error);
       }
@@ -101,15 +100,15 @@ export async function processSourceMap(
     const files = extractSourceFiles(parsedMap, sourceUrl, options);
 
     if (options.verbose) {
-      logger.info(`Extracted ${files.length} files from ${sourceUrl}`);
+      options.logger.info(`Extracted ${files.length} files from ${sourceUrl}`);
     }
 
     return files;
   } catch (error) {
     if (error instanceof SourceMapParseError) {
-      logger.error(error.message);
+      options.logger.error(error.message);
     } else {
-      logger.error(`Error processing source map for ${sourceUrl}: ${error}`);
+      options.logger.error(`Error processing source map for ${sourceUrl}: ${error}`);
     }
 
     if (options.verbose) {

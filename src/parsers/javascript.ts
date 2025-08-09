@@ -1,7 +1,6 @@
 import jsdom from "jsdom";
 import { VM } from "vm2";
-import logger from "./logger.js";
-import type { SourceMapClonerOptions } from "./types.js";
+import type { SourceMapClonerOptions } from "../core/types.js";
 
 const { JSDOM } = jsdom;
 
@@ -14,6 +13,7 @@ const JS_FILE_REGEX = /(?<=")([^"]+\.js)(?=")/gi;
 export function extractJsUrlsFromHtml(
   html: string,
   baseUrl: string,
+  options: SourceMapClonerOptions,
   protocol = "https:",
 ): string[] {
   const urls: string[] = [];
@@ -34,7 +34,7 @@ export function extractJsUrlsFromHtml(
     });
 
     if (!dom || !dom.window || !dom.window.document) {
-      logger.warn("Failed to parse DOM");
+      options.logger.warn("Failed to parse DOM");
       return urls;
     }
 
@@ -76,7 +76,7 @@ export function extractJsUrlsFromHtml(
     // Clean up DOM
     dom.window.close();
   } catch (error) {
-    logger.error(`Error parsing HTML DOM: ${error}`);
+    options.logger.error(`Error parsing HTML DOM: ${error}`);
   }
 
   return urls;
@@ -165,7 +165,7 @@ export async function extractJsFromBuildManifest(
       }
     }
   } catch (error) {
-    logger.error(`Error parsing build manifest: ${error}`);
+    options.logger.error(`Error parsing build manifest: ${error}`);
     if (options.verbose) {
       console.error(error);
     }
@@ -198,7 +198,7 @@ export async function discoverJavaScriptFiles(
     const protocol = new URL(requestUrl).protocol || "https:";
 
     // Extract JS URLs from HTML
-    const htmlUrls = extractJsUrlsFromHtml(html, url, protocol);
+    const htmlUrls = extractJsUrlsFromHtml(html, url, options, protocol);
     jsFiles.push(...htmlUrls);
 
     // Extract JS URLs using regex
@@ -229,7 +229,7 @@ export async function discoverJavaScriptFiles(
 
     return [...new Set(uniqueUrls)];
   } catch (error) {
-    logger.error(`Error discovering JavaScript files from ${url}: ${error}`);
+    options.logger.error(`Error discovering JavaScript files from ${url}: ${error}`);
     if (options.verbose) {
       console.error(error);
     }

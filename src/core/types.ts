@@ -1,4 +1,14 @@
 /**
+ * Logger interface
+ */
+export interface Logger {
+  info: (message: string) => void;
+  warn: (message: string) => void;
+  error: (message: string) => void;
+  debug?: (message: string) => void;
+}
+
+/**
  * Represents a file in memory with its path and content
  */
 export interface SourceFile {
@@ -56,6 +66,7 @@ export interface FetchFunction {
  */
 export interface SourceMapClonerOptions {
   fetch: FetchFunction;
+  logger: Logger;
   verbose?: boolean;
   headers?: Record<string, string>;
   baseUrl?: URL;
@@ -68,6 +79,7 @@ export interface SourceMapClonerOptions {
 export interface CloneOptions {
   urls: string | string[];
   fetch: FetchFunction;
+  logger?: Logger;
   crawl?: boolean;
   headers?: Record<string, string>;
   verbose?: boolean;

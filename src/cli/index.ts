@@ -9,11 +9,12 @@ import {
   cloneSourceMaps,
   type CloneOptions,
   type CloneResult,
-} from "./index.js";
-import { createNodeFetch } from "./node-fetch.js";
-import { InvalidURLError, formatError } from "./errors.js";
-import logger from "./logger.js";
+} from "../core/processor.js";
+import { createNodeFetch } from "../fetchers/node.js";
+import { InvalidURLError, formatError } from "../utils/errors.js";
+import { createConsoleLogger } from "../utils/default-logger";
 
+const logger = createConsoleLogger();
 // Setup global error handlers
 process.on("uncaughtException", (err) => {
   const isJsdomError =
@@ -161,6 +162,7 @@ if (!path.isAbsolute(outputDir)) {
 const options: CloneOptions = {
   urls: args.url,
   fetch: createNodeFetch(),
+  logger,
   crawl: args.crawl,
   headers,
   verbose: args.verbose,

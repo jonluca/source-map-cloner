@@ -1,8 +1,8 @@
-import type { FetchFunction } from "./types.js";
-import parseDataURL from "./parse-data-url.js";
+import type { FetchFunction } from "../core/types.js";
+import parseDataURL from "../parsers/data-url.js";
 import * as iconv from "iconv-lite";
 const { decode } = iconv;
-import labelsToNames from "./labels-to-names";
+import labelsToNames from "../parsers/label-mapper";
 
 /**
  * Fetch content from a URL (including data URLs)

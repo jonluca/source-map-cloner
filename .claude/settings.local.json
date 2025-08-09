@@ -1,6 +1,14 @@
 {
   "permissions": {
-    "allow": ["Bash(npm run:*)"],
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(yarn:*)",
+      "Bash(touch:*)",
+      "Bash(mkdir:*)",
+      "Bash(grep:*)",
+      "Bash(mv:*)",
+      "Bash(tree:*)"
+    ],
     "deny": []
   }
 }

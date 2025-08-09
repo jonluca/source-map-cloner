@@ -4,7 +4,7 @@ import https from "https";
 import * as http from "node:http";
 import type { Got } from "got";
 import got from "got";
-import logger from "./logger.js";
+import logger from "../utils/logger.js";
 
 // TLS cipher configuration for better compatibility
 const TLS_CIPHERS = [
