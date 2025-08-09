@@ -7,6 +7,7 @@ import { InvalidURLError } from "../utils/errors";
 import { noopLogger } from "../utils/default-logger";
 import type { CloneOptions, CloneResult, SourceMapClonerOptions, SourceFile } from "./types";
 import { createBrowserFetch } from "../fetchers/browser";
+import userAgents from "top-user-agents";
 
 /**
  * Fetch and parse a JavaScript file for source maps
@@ -123,6 +124,24 @@ export async function fetchAndWriteSourcesForUrl(
   }
 }
 
+// Build default headers - always use the most popular user agent
+const userAgent = userAgents[0];
+
+const defaultHeaders = {
+  accept:
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+  "accept-language": "en",
+  priority: "u=0, i",
+  "sec-ch-ua": '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
+  "sec-ch-ua-mobile": "?0",
+  "sec-fetch-dest": "document",
+  "sec-fetch-mode": "navigate",
+  "sec-fetch-site": "none",
+  "sec-fetch-user": "?1",
+  "upgrade-insecure-requests": "1",
+  "user-agent": userAgent,
+};
+
 /**
  * Clone source maps from one or more URLs and return results in memory
  */
@@ -157,7 +176,7 @@ export async function cloneSourceMaps(options: CloneOptions): Promise<CloneResul
     fetch: options.fetch,
     logger: options.logger || noopLogger,
     verbose: options.verbose || false,
-    headers: options.headers || {},
+    headers: options.headers || defaultHeaders,
     baseUrl,
     seenSources: new Set<string>(),
   };

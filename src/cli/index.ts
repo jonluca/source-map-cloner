@@ -4,7 +4,6 @@ import fs from "fs/promises";
 import { mkdirp } from "mkdirp";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import UserAgent from "user-agents";
 import { cloneSourceMaps, type CloneOptions, type CloneResult } from "../core/processor";
 import { createNodeFetch } from "../fetchers";
 import { InvalidURLError, formatError } from "../utils/errors";
@@ -101,27 +100,8 @@ const args = yargs(hideBin(process.argv))
   .strict()
   .parseSync();
 
-// Build default headers
-const userAgent = new UserAgent({ deviceCategory: "desktop" });
-const defaultHeaders: Record<string, string> = {
-  accept:
-    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-  "accept-language": "en",
-  "cache-control": "no-cache",
-  pragma: "no-cache",
-  "sec-ch-ua": '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
-  "sec-ch-ua-mobile": "?0",
-  "sec-ch-ua-platform": '"macOS"',
-  "sec-fetch-dest": "document",
-  "sec-fetch-mode": "navigate",
-  "sec-fetch-site": "none",
-  "sec-fetch-user": "?1",
-  "upgrade-insecure-requests": "1",
-  "user-agent": userAgent.toString(),
-};
-
 // Merge custom headers with defaults
-const headers = { ...defaultHeaders, ...args.headers };
+const headers = { ...args.headers };
 
 // Determine output directory
 let outputDir: string;

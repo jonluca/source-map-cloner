@@ -1323,13 +1323,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/user-agents@npm:^1.0.4":
-  version: 1.0.4
-  resolution: "@types/user-agents@npm:1.0.4"
-  checksum: 10c0/07f0ad3c4c742775ddcea6b6d7c06e7256318dd2ca7530785a61872964963bd918b61749c09183a20195d10bd7d8bd31fe031ca42e227e9cf25fd140b7ef525a
-  languageName: node
-  linkType: hard
-
 "@types/yargs-parser@npm:*":
   version: 21.0.3
   resolution: "@types/yargs-parser@npm:21.0.3"
@@ -5073,13 +5066,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"lodash.clonedeep@npm:^4.5.0":
-  version: 4.5.0
-  resolution: "lodash.clonedeep@npm:4.5.0"
-  checksum: 10c0/2caf0e4808f319d761d2939ee0642fa6867a4bbf2cfce43276698828380756b99d4c4fa226d881655e6ac298dd453fe12a5ec8ba49861777759494c534936985
-  languageName: node
-  linkType: hard
-
 "lodash.deburr@npm:^3.0.0":
   version: 3.2.0
   resolution: "lodash.deburr@npm:3.2.0"
@@ -7088,7 +7074,6 @@ __metadata:
     "@types/eslint": "npm:9.6.1"
     "@types/jsdom": "npm:^21.1.7"
     "@types/node": "npm:24.2.1"
-    "@types/user-agents": "npm:^1.0.4"
     "@types/yargs": "npm:^17.0.33"
     "@typescript-eslint/eslint-plugin": "npm:^8.39.0"
     "@typescript-eslint/eslint-plugin-tslint": "npm:^7.0.2"
@@ -7111,10 +7096,10 @@ __metadata:
     prettier: "npm:^3.6.2"
     pretty-quick: "npm:^4.2.2"
     source-map: "npm:^0.7.6"
+    top-user-agents: "npm:^2.1.62"
     tsx: "npm:^4.20.3"
     typescript: "npm:5.9.2"
     typescript-eslint: "npm:^8.39.0"
-    user-agents: "npm:^1.1.626"
     vm2: "npm:^3.9.19"
     yargs: "npm:^18.0.0"
   bin:
@@ -7554,6 +7539,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"top-user-agents@npm:^2.1.62":
+  version: 2.1.62
+  resolution: "top-user-agents@npm:2.1.62"
+  checksum: 10c0/ef2e36f59ebc77978fb473f5201f49eec313a5b9045847fbd89a53fde13b5c1d425af4375dcb421234270174667c9bcec14cdf224e7738c40d58874cbb2ab4d4
+  languageName: node
+  linkType: hard
+
 "tough-cookie@npm:^5.1.1, tough-cookie@npm:^5.1.2":
   version: 5.1.2
   resolution: "tough-cookie@npm:5.1.2"
@@ -7860,15 +7852,6 @@ __metadata:
   dependencies:
     punycode: "npm:^2.1.0"
   checksum: 10c0/4ef57b45aa820d7ac6496e9208559986c665e49447cb072744c13b66925a362d96dd5a46c4530a6b8e203e5db5fe849369444440cb22ecfc26c679359e5dfa3c
-  languageName: node
-  linkType: hard
-
-"user-agents@npm:^1.1.626":
-  version: 1.1.626
-  resolution: "user-agents@npm:1.1.626"
-  dependencies:
-    lodash.clonedeep: "npm:^4.5.0"
-  checksum: 10c0/1f276c67a6fb003a58bc473a364a4e7f72ddd58fca9f0d5f5fba4b737a22758e3d645a314f432e3fe537ac40416bc5e15055ab084fb78f98b4be7aeab78b65b0
   languageName: node
   linkType: hard
 

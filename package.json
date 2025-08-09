@@ -46,7 +46,7 @@
     "mkdirp": "^3.0.1",
     "p-map": "^7.0.3",
     "source-map": "^0.7.6",
-    "user-agents": "^1.1.626",
+    "top-user-agents": "^2.1.62",
     "vm2": "^3.9.19",
     "yargs": "^18.0.0"
   },
@@ -58,7 +58,6 @@
     "@types/eslint": "9.6.1",
     "@types/jsdom": "^21.1.7",
     "@types/node": "24.2.1",
-    "@types/user-agents": "^1.0.4",
     "@types/yargs": "^17.0.33",
     "@typescript-eslint/eslint-plugin": "^8.39.0",
     "@typescript-eslint/eslint-plugin-tslint": "^7.0.2",
