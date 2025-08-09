@@ -14,12 +14,21 @@ const { JSDOM } = jsdom;
 const { SourceMapConsumer } = sourceMap;
 
 export interface SourceMapClonerOptions {
-  verbose: boolean;
+  verbose?: boolean;
   urlPathBasedSaving?: boolean;
-  headers: Record<string, string>;
-  baseUrl: URL;
+  headers?: Record<string, string>;
+  baseUrl?: URL;
   outputDir: string;
   seenSources?: Set<string>;
+}
+
+export interface CloneOptions {
+  urls: string | string[];
+  outputDir?: string;
+  urlPathBasedSaving?: boolean;
+  crawl?: boolean;
+  headers?: Record<string, string>;
+  verbose?: boolean;
 }
 const doesFileExists = async (path: string) => {
   try {
@@ -134,9 +143,9 @@ const getJsFilesFromManifest = async (
   options: SourceMapClonerOptions,
 ) => {
   try {
-    const newUrl = new URL(url, options.baseUrl.origin);
+    const newUrl = new URL(url, options.baseUrl?.origin || url);
     const resp = await gotClient(newUrl, {
-      headers: options.headers,
+      headers: options.headers || {},
     });
     const { body: data, requestUrl } = resp;
     const newVm = new VM({ eval: false, wasm: false, allowAsync: false });
@@ -195,7 +204,7 @@ const fetchAndParseJsFile = async (
   for (const u of toCheck) {
     try {
       if (u) {
-        const { sourceContent } = await fetchFromURL(u, url, headers);
+        const { sourceContent } = await fetchFromURL(u, url, headers || {});
         if (sourceContent && sourceContent[0] !== "<") {
           if (verbose) {
             logger.info(`Found source map content: ${u}`);
@@ -227,7 +236,7 @@ export const fetchAndWriteSourcesForUrl = async (
   } else {
     try {
       const resp = await gotClient(baseUrl, {
-        headers: options.headers,
+        headers: options.headers || {},
         agent,
         http2: true,
       });
@@ -240,7 +249,7 @@ export const fetchAndWriteSourcesForUrl = async (
         url: baseUrl,
         pretendToBeVisual: true,
         cookieJar,
-        userAgent: options.headers["user-agent"],
+        userAgent: options.headers?.["user-agent"],
         virtualConsole,
       });
       if (!dom) {
@@ -330,3 +339,103 @@ export const fetchAndWriteSourcesForUrl = async (
 
   logger.info(`Finished ${baseUrl}`);
 };
+
+export async function cloneSourceMaps(options: CloneOptions): Promise<void> {
+  const urls = Array.isArray(options.urls) ? options.urls : [options.urls];
+  const firstUrl = urls[0];
+  let baseUrl: URL;
+  
+  try {
+    baseUrl = new URL(firstUrl);
+  } catch (e) {
+    throw new Error(`Invalid URL: ${firstUrl}`);
+  }
+  
+  const outputDir = options.outputDir || baseUrl.hostname;
+  const fullOutputDir = path.isAbsolute(outputDir) 
+    ? outputDir 
+    : path.join(process.cwd(), outputDir);
+  
+  const clonerOptions: SourceMapClonerOptions = {
+    verbose: options.verbose || false,
+    urlPathBasedSaving: options.urlPathBasedSaving || false,
+    headers: options.headers || {},
+    baseUrl,
+    outputDir: fullOutputDir,
+    seenSources: new Set<string>(),
+  };
+  
+  if (options.crawl) {
+    const Crawler = (await import("crawler")).default;
+    const crawlUrls = new Set<string>();
+    const promises: Promise<any>[] = [];
+    
+    const c = new Crawler({
+      maxConnections: 10,
+      headers: clonerOptions.headers,
+      callback(error, res, done: any) {
+        if (error || !res.$) {
+          return done();
+        }
+        
+        const anchorTags = res.$("a");
+        const urlsOnPage = (Array.from(anchorTags) as any[])
+          .map((l) => l.attribs?.href)
+          .filter((l) => l && (l.startsWith(baseUrl.href) || l.startsWith("/")));
+        
+        const unique = [
+          ...new Set(
+            urlsOnPage.map((l) => {
+              const parsed = new URL(
+                l?.startsWith("/") ? `${baseUrl.origin}${l}` : l,
+              );
+              parsed.hash = "";
+              parsed.search = "";
+              return parsed.href;
+            }),
+          ),
+        ];
+        
+        unique.forEach((u) => {
+          if (!crawlUrls.has(u)) {
+            crawlUrls.add(u);
+            promises.push(fetchAndWriteSourcesForUrl(u, clonerOptions));
+            c.add(u);
+          }
+        });
+        
+        for (const uri of [res?.options?.uri, res?.options?.url]) {
+          if (uri && !crawlUrls.has(uri)) {
+            crawlUrls.add(uri);
+            promises.push(fetchAndWriteSourcesForUrl(uri, clonerOptions));
+          }
+        }
+        done();
+      },
+    });
+    
+    return new Promise((resolve, reject) => {
+      c.on("drain", async () => {
+        try {
+          await Promise.all(promises);
+          if (options.verbose) {
+            logger.info(`Finished crawling ${baseUrl}`);
+          }
+          resolve();
+        } catch (e) {
+          reject(e);
+        }
+      });
+      
+      for (const url of urls) {
+        c.add(url);
+      }
+    });
+  } else {
+    for (const url of urls) {
+      await fetchAndWriteSourcesForUrl(url, clonerOptions);
+    }
+  }
+}
+
+export default cloneSourceMaps;
