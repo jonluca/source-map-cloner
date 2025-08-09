@@ -18,14 +18,11 @@ export async function fetchFromURL(
     const dataURL = parseDataURL(sourceMapUrl);
     if (dataURL) {
       // JSON text SHALL be encoded in Unicode. The default encoding is UTF-8.
-      const encodingName =
-        labelToName(dataURL.parameters.get("charset")) || "UTF-8";
+      const encodingName = labelToName(dataURL.parameters.get("charset")) || "UTF-8";
       const sourceContent = decode(dataURL.body, encodingName);
       return { sourceContent };
     }
-    throw new Error(
-      `Failed to parse source map from "data" URL: ${sourceMapUrl}`,
-    );
+    throw new Error(`Failed to parse source map from "data" URL: ${sourceMapUrl}`);
   }
 
   // Handle regular URLs

@@ -1,4 +1,4 @@
-import type { RawSourceMap } from "source-map-js";
+import type { RawSourceMap } from "source-map";
 import sourceMap from "source-map";
 import { SourceMapParseError } from "../utils/errors.js";
 import { getOutputPath } from "../utils/paths.js";
@@ -14,15 +14,10 @@ export interface ParsedSourceMap {
 /**
  * Parse a source map from string or object
  */
-export async function parseSourceMap(
-  sourceMapData: string | object,
-  sourceUrl: string,
-): Promise<ParsedSourceMap> {
+export async function parseSourceMap(sourceMapData: string | object, sourceUrl: string): Promise<ParsedSourceMap> {
   try {
     const parsed = (await new SourceMapConsumer(
-      typeof sourceMapData === "string"
-        ? JSON.parse(sourceMapData)
-        : sourceMapData,
+      typeof sourceMapData === "string" ? JSON.parse(sourceMapData) : sourceMapData,
     )) as unknown as RawSourceMap;
 
     return {

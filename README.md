@@ -113,11 +113,7 @@ for (const [filePath, content] of result.files) {
 #### TypeScript Support
 
 ```typescript
-import cloneSourceMaps, {
-  CloneOptions,
-  CloneResult,
-  FetchFunction,
-} from "source-map-cloner";
+import cloneSourceMaps, { CloneOptions, CloneResult, FetchFunction } from "source-map-cloner";
 import { createNodeFetch } from "source-map-cloner/node-fetch";
 
 const options: CloneOptions = {

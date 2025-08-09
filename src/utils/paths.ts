@@ -45,9 +45,7 @@ export function dirname(path: string): string {
  */
 export function sanitizePath(basePath: string, relativePath: string): string {
   // Remove leading protocol and domain
-  let sanitized = relativePath
-    .replace(/^webpack:\/\/_N_E\//, "")
-    .replace(/^(.*?):\/\//, "");
+  let sanitized = relativePath.replace(/^webpack:\/\/_N_E\//, "").replace(/^(.*?):\/\//, "");
 
   // Remove leading slashes
   sanitized = sanitized.replace(/^\/+/, "");
@@ -80,9 +78,7 @@ export function getOutputPath(
 ): string {
   const { outputPrefix = "" } = options;
 
-  const value = source
-    .replace(/^webpack:\/\/_N_E\//, "")
-    .replace(/^(.*?):\/\//, "");
+  const value = source.replace(/^webpack:\/\/_N_E\//, "").replace(/^(.*?):\/\//, "");
 
   if (!value) {
     throw new Error(`Empty source path: ${source}`);

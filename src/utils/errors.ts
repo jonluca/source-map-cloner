@@ -19,9 +19,7 @@ export class InvalidURLError extends SourceMapClonerError {
 
 export class HTTPError extends SourceMapClonerError {
   constructor(url: string, statusCode?: number, details?: unknown) {
-    const message = statusCode
-      ? `HTTP ${statusCode} error fetching ${url}`
-      : `Network error fetching ${url}`;
+    const message = statusCode ? `HTTP ${statusCode} error fetching ${url}` : `Network error fetching ${url}`;
     super(message, "HTTP_ERROR", details);
     this.name = "HTTPError";
   }
@@ -36,11 +34,7 @@ export class SourceMapParseError extends SourceMapClonerError {
 
 export class FileSystemError extends SourceMapClonerError {
   constructor(operation: string, path: string, details?: unknown) {
-    super(
-      `File system error during ${operation}: ${path}`,
-      "FS_ERROR",
-      details,
-    );
+    super(`File system error during ${operation}: ${path}`, "FS_ERROR", details);
     this.name = "FileSystemError";
   }
 }

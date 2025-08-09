@@ -52,9 +52,7 @@ export function extractJsUrlsFromHtml(
     });
 
     // Extract from link tags with JS files
-    const links = dom.window.document.querySelectorAll(
-      "[href]",
-    ) as NodeListOf<HTMLAnchorElement>;
+    const links = dom.window.document.querySelectorAll("[href]") as NodeListOf<HTMLAnchorElement>;
     links.forEach((link) => {
       const href = link.href;
       if (href) {
@@ -85,10 +83,7 @@ export function extractJsUrlsFromHtml(
 /**
  * Extract JavaScript URLs from content using regex
  */
-export function extractJsUrlsFromText(
-  content: string,
-  baseUrl: string,
-): string[] {
+export function extractJsUrlsFromText(content: string, baseUrl: string): string[] {
   const urls: string[] = [];
   const matches = content.match(JS_FILE_REGEX);
 
@@ -134,9 +129,7 @@ export async function extractJsFromBuildManifest(
     vm.run(`const self = {};`);
     vm.run(data);
 
-    const manifest = JSON.parse(
-      vm.run("JSON.stringify(self.__BUILD_MANIFEST)"),
-    );
+    const manifest = JSON.parse(vm.run("JSON.stringify(self.__BUILD_MANIFEST)"));
 
     // Extract JS files from manifest
     const values = Object.values(manifest).flat() as (string | object)[];
@@ -177,10 +170,7 @@ export async function extractJsFromBuildManifest(
 /**
  * Discover all JavaScript files from a URL
  */
-export async function discoverJavaScriptFiles(
-  url: string,
-  options: SourceMapClonerOptions,
-): Promise<string[]> {
+export async function discoverJavaScriptFiles(url: string, options: SourceMapClonerOptions): Promise<string[]> {
   const jsFiles: string[] = [];
 
   // If the URL is already a JS file, return it
@@ -220,10 +210,7 @@ export async function discoverJavaScriptFiles(
     // Check for Next.js build manifest
     const manifestUrl = uniqueUrls.find((u) => u.endsWith("_buildManifest.js"));
     if (manifestUrl) {
-      const manifestFiles = await extractJsFromBuildManifest(
-        manifestUrl,
-        options,
-      );
+      const manifestFiles = await extractJsFromBuildManifest(manifestUrl, options);
       uniqueUrls.push(...manifestFiles);
     }
 

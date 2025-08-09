@@ -1,29 +1,17 @@
 import pMap from "p-map";
 import { processSourceMap } from "../parsers/source-map.js";
-import {
-  discoverJavaScriptFiles,
-  getFallbackSourceMapUrl,
-} from "../parsers/javascript.js";
+import { discoverJavaScriptFiles, getFallbackSourceMapUrl } from "../parsers/javascript.js";
 import { getSourceMappingURL } from "./source-map-utils.js";
 import { fetchFromURL } from "../fetchers/utils.js";
 import { InvalidURLError } from "../utils/errors.js";
 import { noopLogger } from "../utils/default-logger.js";
-import type {
-  CloneOptions,
-  CloneResult,
-  SourceMapClonerOptions,
-  SourceFile,
-  Logger,
-} from "./types.js";
+import type { CloneOptions, CloneResult, SourceMapClonerOptions, SourceFile, Logger } from "./types.js";
 import { createBrowserFetch } from "../fetchers/browser.js";
 
 /**
  * Fetch and parse a JavaScript file for source maps
  */
-async function fetchAndParseJsFile(
-  url: string,
-  options: SourceMapClonerOptions,
-): Promise<SourceFile[]> {
+async function fetchAndParseJsFile(url: string, options: SourceMapClonerOptions): Promise<SourceFile[]> {
   const { verbose, headers, fetch, logger } = options;
 
   try {
@@ -35,18 +23,11 @@ async function fetchAndParseJsFile(
     }
 
     // Try both the source map URL and fallback .map URL
-    const urlsToCheck = [sourceMappingURL, getFallbackSourceMapUrl(url)].filter(
-      Boolean,
-    ) as string[];
+    const urlsToCheck = [sourceMappingURL, getFallbackSourceMapUrl(url)].filter(Boolean) as string[];
 
     for (const sourceMapUrl of urlsToCheck) {
       try {
-        const { sourceContent } = await fetchFromURL(
-          sourceMapUrl,
-          url,
-          headers || {},
-          fetch,
-        );
+        const { sourceContent } = await fetchFromURL(sourceMapUrl, url, headers || {}, fetch);
 
         if (sourceContent && !sourceContent.startsWith("<")) {
           if (verbose) {
@@ -61,9 +42,7 @@ async function fetchAndParseJsFile(
         }
       } catch (error) {
         if (verbose) {
-          options.logger.warn(
-            `Failed to fetch source map from ${sourceMapUrl}: ${error}`,
-          );
+          options.logger.warn(`Failed to fetch source map from ${sourceMapUrl}: ${error}`);
         }
       }
     }
@@ -96,9 +75,7 @@ export async function fetchAndWriteSourcesForUrl(
     unseenFiles.forEach((file) => seenSources.add(file));
 
     if (options.verbose) {
-      options.logger.info(
-        `Found ${unseenFiles.length} new JavaScript files from ${url}`,
-      );
+      options.logger.info(`Found ${unseenFiles.length} new JavaScript files from ${url}`);
     }
 
     // Process files in parallel with concurrency limit
@@ -149,9 +126,7 @@ export async function fetchAndWriteSourcesForUrl(
 /**
  * Clone source maps from one or more URLs and return results in memory
  */
-export async function cloneSourceMaps(
-  options: CloneOptions,
-): Promise<CloneResult> {
+export async function cloneSourceMaps(options: CloneOptions): Promise<CloneResult> {
   const startTime = Date.now();
   const urls = Array.isArray(options.urls) ? options.urls : [options.urls];
 
@@ -206,11 +181,7 @@ export async function cloneSourceMaps(
 /**
  * Crawl websites and process discovered pages
  */
-async function crawlAndProcess(
-  urls: string[],
-  options: SourceMapClonerOptions,
-  result: CloneResult,
-): Promise<void> {
+async function crawlAndProcess(urls: string[], options: SourceMapClonerOptions, result: CloneResult): Promise<void> {
   // Dynamic import for crawler (Node.js only)
   const Crawler = (await import("crawler")).default;
   const crawledUrls = new Set<string>();
@@ -230,17 +201,12 @@ async function crawlAndProcess(
         const anchorTags = res.$("a");
         const foundUrls = (Array.from(anchorTags) as any[])
           .map((tag) => tag.attribs?.href)
-          .filter(
-            (href) =>
-              href && (href.startsWith(baseUrl.href) || href.startsWith("/")),
-          );
+          .filter((href) => href && (href.startsWith(baseUrl.href) || href.startsWith("/")));
 
         const uniqueUrls = [
           ...new Set(
             foundUrls.map((href) => {
-              const url = new URL(
-                href.startsWith("/") ? `${baseUrl.origin}${href}` : href,
-              );
+              const url = new URL(href.startsWith("/") ? `${baseUrl.origin}${href}` : href);
               url.hash = "";
               url.search = "";
               return url.href;
@@ -288,13 +254,7 @@ async function crawlAndProcess(
 }
 
 // Re-export types for convenience
-export type {
-  CloneOptions,
-  CloneResult,
-  SourceMapClonerOptions,
-  SourceFile,
-  FetchFunction,
-} from "./types.js";
+export type { CloneOptions, CloneResult, SourceMapClonerOptions, SourceFile, FetchFunction } from "./types.js";
 
 export { createBrowserFetch };
 export default cloneSourceMaps;

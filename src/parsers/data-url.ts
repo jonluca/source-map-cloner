@@ -1,36 +1,24 @@
 const removeLeadingAndTrailingHTTPWhitespace = (string: string): string =>
   string.replace(/^[ \t\n\r]+/, "").replace(/[ \t\n\r]+$/, "");
 
-const removeTrailingHTTPWhitespace = (string: string): string =>
-  string.replace(/[ \t\n\r]+$/, "");
+const removeTrailingHTTPWhitespace = (string: string): string => string.replace(/[ \t\n\r]+$/, "");
 
-const isHTTPWhitespaceChar = (char: string): boolean =>
-  char === " " || char === "\t" || char === "\n" || char === "\r";
+const isHTTPWhitespaceChar = (char: string): boolean => char === " " || char === "\t" || char === "\n" || char === "\r";
 
-const solelyContainsHTTPTokenCodePoints = (string: string): boolean =>
-  /^[-!#$%&'*+.^_`|~A-Za-z0-9]*$/.test(string);
+const solelyContainsHTTPTokenCodePoints = (string: string): boolean => /^[-!#$%&'*+.^_`|~A-Za-z0-9]*$/.test(string);
 
-const soleyContainsHTTPQuotedStringTokenCodePoints = (
-  string: string,
-): boolean => /^[\t\u0020-\u007E\u0080-\u00FF]*$/.test(string);
+const soleyContainsHTTPQuotedStringTokenCodePoints = (string: string): boolean =>
+  /^[\t\u0020-\u007E\u0080-\u00FF]*$/.test(string);
 
-const asciiLowercase = (string: string): string =>
-  string.replace(/[A-Z]/g, (l: string) => l.toLowerCase());
+const asciiLowercase = (string: string): string => string.replace(/[A-Z]/g, (l: string) => l.toLowerCase());
 
-const collectAnHTTPQuotedString = (
-  input: string,
-  position: number,
-): [string, number] => {
+const collectAnHTTPQuotedString = (input: string, position: number): [string, number] => {
   let value = "";
 
   position += 1;
 
   while (true) {
-    while (
-      position < input.length &&
-      input[position] !== '"' &&
-      input[position] !== "\\"
-    ) {
+    while (position < input.length && input[position] !== '"' && input[position] !== "\\") {
       value += input[position];
 
       position += 1;
@@ -62,11 +50,7 @@ const collectAnHTTPQuotedString = (
 };
 
 function isASCIIHex(c: number): boolean {
-  return (
-    (c >= 0x30 && c <= 0x39) ||
-    (c >= 0x41 && c <= 0x46) ||
-    (c >= 0x61 && c <= 0x66)
-  );
+  return (c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x46) || (c >= 0x61 && c <= 0x66);
 }
 
 function percentDecodeBytes(input: Uint8Array): Uint8Array {
@@ -78,16 +62,10 @@ function percentDecodeBytes(input: Uint8Array): Uint8Array {
 
     if (byte !== 0x25) {
       output[outputIndex] = byte;
-    } else if (
-      byte === 0x25 &&
-      (!isASCIIHex(input[i + 1]) || !isASCIIHex(input[i + 2]))
-    ) {
+    } else if (byte === 0x25 && (!isASCIIHex(input[i + 1]) || !isASCIIHex(input[i + 2]))) {
       output[outputIndex] = byte;
     } else {
-      output[outputIndex] = parseInt(
-        String.fromCodePoint(input[i + 1], input[i + 2]),
-        16,
-      );
+      output[outputIndex] = parseInt(String.fromCodePoint(input[i + 1], input[i + 2]), 16);
       i += 2;
     }
 
@@ -123,9 +101,7 @@ export default function parseDataUrl(stringInput: string): any {
     position += 1;
   }
 
-  mediaType = mediaType
-    .replace(/^[ \t\n\f\r]+/, "")
-    .replace(/[ \t\n\f\r]+$/, "");
+  mediaType = mediaType.replace(/^[ \t\n\f\r]+/, "").replace(/[ \t\n\f\r]+$/, "");
 
   if (position === input.length) {
     return null;
@@ -138,9 +114,7 @@ export default function parseDataUrl(stringInput: string): any {
   let body = Buffer.from(percentDecodeBytes(Buffer.from(encodedBody, "utf-8")));
 
   // Can't use /i regexp flag because it isn't restricted to ASCII.
-  const mimeTypeBase64MatchResult = /(.*); *[Bb][Aa][Ss][Ee]64$/.exec(
-    mediaType,
-  );
+  const mimeTypeBase64MatchResult = /(.*); *[Bb][Aa][Ss][Ee]64$/.exec(mediaType);
 
   if (mimeTypeBase64MatchResult) {
     const stringBody = body.toString("binary");
@@ -176,10 +150,7 @@ export default function parseDataUrl(stringInput: string): any {
   let positionMediaType = 0;
   let type = "";
 
-  while (
-    positionMediaType < inputMediaType.length &&
-    inputMediaType[positionMediaType] !== "/"
-  ) {
+  while (positionMediaType < inputMediaType.length && inputMediaType[positionMediaType] !== "/") {
     type += inputMediaType[positionMediaType];
     positionMediaType += 1;
   }
@@ -197,10 +168,7 @@ export default function parseDataUrl(stringInput: string): any {
 
   let subtype = "";
 
-  while (
-    positionMediaType < inputMediaType.length &&
-    inputMediaType[positionMediaType] !== ";"
-  ) {
+  while (positionMediaType < inputMediaType.length && inputMediaType[positionMediaType] !== ";") {
     subtype += inputMediaType[positionMediaType];
     positionMediaType += 1;
   }
@@ -247,22 +215,13 @@ export default function parseDataUrl(stringInput: string): any {
     let parameterValue = "";
 
     if (inputMediaType[positionMediaType] === '"') {
-      [parameterValue, positionMediaType] = collectAnHTTPQuotedString(
-        inputMediaType,
-        positionMediaType,
-      );
+      [parameterValue, positionMediaType] = collectAnHTTPQuotedString(inputMediaType, positionMediaType);
 
-      while (
-        positionMediaType < inputMediaType.length &&
-        inputMediaType[positionMediaType] !== ";"
-      ) {
+      while (positionMediaType < inputMediaType.length && inputMediaType[positionMediaType] !== ";") {
         positionMediaType += 1;
       }
     } else {
-      while (
-        positionMediaType < inputMediaType.length &&
-        inputMediaType[positionMediaType] !== ";"
-      ) {
+      while (positionMediaType < inputMediaType.length && inputMediaType[positionMediaType] !== ";") {
         parameterValue += inputMediaType[positionMediaType];
         positionMediaType += 1;
       }

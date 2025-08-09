@@ -5,11 +5,7 @@ import { mkdirp } from "mkdirp";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import UserAgent from "user-agents";
-import {
-  cloneSourceMaps,
-  type CloneOptions,
-  type CloneResult,
-} from "../core/processor.js";
+import { cloneSourceMaps, type CloneOptions, type CloneResult } from "../core/processor.js";
 import { createNodeFetch } from "../fetchers/node.js";
 import { InvalidURLError, formatError } from "../utils/errors.js";
 import { createConsoleLogger } from "../utils/default-logger";
@@ -17,8 +13,7 @@ import { createConsoleLogger } from "../utils/default-logger";
 const logger = createConsoleLogger();
 // Setup global error handlers
 process.on("uncaughtException", (err) => {
-  const isJsdomError =
-    err.stack?.includes("jsdom") || err.stack?.includes("at https://");
+  const isJsdomError = err.stack?.includes("jsdom") || err.stack?.includes("at https://");
   if (!isJsdomError) {
     logger.error(`Uncaught exception: ${formatError(err)}`);
     process.exit(1);
@@ -38,14 +33,12 @@ const args = yargs(hideBin(process.argv))
       alias: "u",
       demandOption: true,
       array: true,
-      description:
-        "URL(s) to process. Can be provided multiple times (-u url1 -u url2) or as an array",
+      description: "URL(s) to process. Can be provided multiple times (-u url1 -u url2) or as an array",
     },
     dir: {
       type: "string",
       alias: "d",
-      description:
-        "Output directory for extracted files (defaults to hostname)",
+      description: "Output directory for extracted files (defaults to hostname)",
     },
     crawl: {
       type: "boolean",
@@ -58,23 +51,18 @@ const args = yargs(hideBin(process.argv))
       alias: "H",
       default: [],
       array: true,
-      description:
-        'HTTP Headers to send, in the format "HeaderName: HeaderValue"',
+      description: 'HTTP Headers to send, in the format "HeaderName: HeaderValue"',
       coerce: (headers: string[]) => {
         const parsed: Record<string, string> = {};
         for (const header of headers) {
           const colonIndex = header.indexOf(":");
           if (colonIndex === -1) {
-            throw new Error(
-              `Invalid header format: ${header}. Expected "HeaderName: HeaderValue"`,
-            );
+            throw new Error(`Invalid header format: ${header}. Expected "HeaderName: HeaderValue"`);
           }
           const key = header.substring(0, colonIndex).trim();
           const value = header.substring(colonIndex + 1).trim();
           if (!key || !value) {
-            throw new Error(
-              `Invalid header format: ${header}. Both name and value are required`,
-            );
+            throw new Error(`Invalid header format: ${header}. Both name and value are required`);
           }
           parsed[key] = value;
         }
@@ -90,25 +78,15 @@ const args = yargs(hideBin(process.argv))
     dryRun: {
       type: "boolean",
       default: false,
-      description:
-        "Show what files would be written without actually writing them",
+      description: "Show what files would be written without actually writing them",
     },
   })
   .example([
     ["$0 -u https://example.com", "Clone source maps from a single URL"],
     ["$0 -u https://example.com -d ./output", "Specify output directory"],
-    [
-      "$0 -u https://example.com --crawl",
-      "Enable crawling to discover all pages",
-    ],
-    [
-      '$0 -u https://example.com -H "Authorization: Bearer token"',
-      "Add authentication header",
-    ],
-    [
-      "$0 -u https://example.com --dry-run",
-      "Preview files without writing them",
-    ],
+    ["$0 -u https://example.com --crawl", "Enable crawling to discover all pages"],
+    ['$0 -u https://example.com -H "Authorization: Bearer token"', "Add authentication header"],
+    ["$0 -u https://example.com --dry-run", "Preview files without writing them"],
   ])
   .help()
   .alias("help", "h")
@@ -125,8 +103,7 @@ const defaultHeaders: Record<string, string> = {
   "accept-language": "en",
   "cache-control": "no-cache",
   pragma: "no-cache",
-  "sec-ch-ua":
-    '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
+  "sec-ch-ua": '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
   "sec-ch-ua-mobile": "?0",
   "sec-ch-ua-platform": '"macOS"',
   "sec-fetch-dest": "document",
@@ -174,20 +151,14 @@ if (args.verbose) {
   logger.info(`  URLs: ${args.url.join(", ")}`);
   logger.info(`  Output directory: ${outputDir}`);
   logger.info(`  Crawling: ${args.crawl ? "enabled" : "disabled"}`);
-  logger.info(
-    `  Custom headers: ${Object.keys(args.headers).length} configured`,
-  );
+  logger.info(`  Custom headers: ${Object.keys(args.headers).length} configured`);
   logger.info(`  Dry run: ${args.dryRun ? "enabled" : "disabled"}`);
 }
 
 /**
  * Write files from the clone result to disk
  */
-async function writeFilesToDisk(
-  result: CloneResult,
-  outputDir: string,
-  dryRun: boolean,
-): Promise<void> {
+async function writeFilesToDisk(result: CloneResult, outputDir: string, dryRun: boolean): Promise<void> {
   if (dryRun) {
     logger.info("\n=== DRY RUN MODE - No files will be written ===\n");
   }
@@ -224,9 +195,7 @@ async function writeFilesToDisk(
   }
 
   if (dryRun) {
-    logger.info(
-      `=== Would write ${filesWritten} files (${formatBytes(bytesWritten)}) ===`,
-    );
+    logger.info(`=== Would write ${filesWritten} files (${formatBytes(bytesWritten)}) ===`);
   } else {
     logger.info(`✓ Wrote ${filesWritten} files (${formatBytes(bytesWritten)})`);
   }
@@ -250,9 +219,7 @@ function formatBytes(bytes: number): string {
  */
 function displayErrors(result: CloneResult): void {
   if (result.errors.length > 0) {
-    logger.warn(
-      `Encountered ${result.errors.length} errors during processing:`,
-    );
+    logger.warn(`Encountered ${result.errors.length} errors during processing:`);
     for (const error of result.errors) {
       if (error.url) {
         logger.warn(`  - URL ${error.url}: ${error.error}`);
@@ -278,9 +245,7 @@ async function main() {
     logger.info(`=== Extraction Complete ===`);
     logger.info(`  Total files extracted: ${result.stats.totalFiles}`);
     logger.info(`  Total size: ${formatBytes(result.stats.totalSize)}`);
-    logger.info(
-      `  Duration: ${((result.stats.duration || 0) / 1000).toFixed(2)}s`,
-    );
+    logger.info(`  Duration: ${((result.stats.duration || 0) / 1000).toFixed(2)}s`);
 
     // Display errors if any
     displayErrors(result);
