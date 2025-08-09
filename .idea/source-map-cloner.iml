@@ -24,6 +24,10 @@
       <excludeFolder url="file://$MODULE_DIR$/venture.angellist.com" />
       <excludeFolder url="file://$MODULE_DIR$/civit" />
       <excludeFolder url="file://$MODULE_DIR$/suno" />
+      <excludeFolder url="file://$MODULE_DIR$/angel_nov4" />
+      <excludeFolder url="file://$MODULE_DIR$/angel_oct24" />
+      <excludeFolder url="file://$MODULE_DIR$/blind" />
+      <excludeFolder url="file://$MODULE_DIR$/blind_2" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

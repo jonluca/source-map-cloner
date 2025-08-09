@@ -22,7 +22,9 @@ export const ciphers = [
   "SSL_RSA_WITH_3DES_EDE_CBC_SHA",
 ].join(":");
 
-export const cookieJar = new CookieJar();
+export const cookieJar = new CookieJar(undefined, {
+  rejectPublicSuffixes: false,
+});
 const options: AgentOptions = {
   keepAlive: true,
   family: 4, // default to ipv4
