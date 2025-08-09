@@ -51,7 +51,7 @@ export interface TreeNode {
 }
 
 // Helper function to build directory structure
-function buildDirectoryStructure(files: Array<{ path: string; content: string }>) {
+function buildDirectoryStructure(files: { path: string; content: string }[]) {
   const root: TreeNode = {
     name: "/",
     type: "directory",

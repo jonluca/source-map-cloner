@@ -21,8 +21,8 @@ export function extractJsUrlsFromHtml(
   try {
     const virtualConsole = new jsdom.VirtualConsole();
     // Suppress console errors from JSDOM
-    virtualConsole.on("error", () => {});
-    virtualConsole.on("warn", () => {});
+    virtualConsole.on("error", () => undefined);
+    virtualConsole.on("warn", () => undefined);
 
     const dom = new JSDOM(html, {
       runScripts: "dangerously",
@@ -33,7 +33,7 @@ export function extractJsUrlsFromHtml(
       virtualConsole,
     });
 
-    if (!dom || !dom.window || !dom.window.document) {
+    if (!dom?.window?.document) {
       options.logger.warn("Failed to parse DOM");
       return urls;
     }
@@ -52,9 +52,9 @@ export function extractJsUrlsFromHtml(
     });
 
     // Extract from link tags with JS files
-    const links = dom.window.document.querySelectorAll("[href]") as NodeListOf<HTMLAnchorElement>;
+    const links = dom.window.document.querySelectorAll("[href]");
     links.forEach((link) => {
-      const href = link.href;
+      const href = "href" in link && (link.href as string);
       if (href) {
         try {
           const url = new URL(href, baseUrl);
@@ -133,7 +133,7 @@ export async function extractJsFromBuildManifest(
 
     // Extract JS files from manifest
     const values = Object.values(manifest).flat() as (string | object)[];
-    const strValues = values.filter((v) => typeof v === "string") as string[];
+    const strValues = values.filter((v) => typeof v === "string");
     const files = strValues.filter((v) => v.endsWith(".js"));
     const uniqueFiles = [...new Set(files)];
 

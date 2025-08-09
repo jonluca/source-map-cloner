@@ -38,8 +38,8 @@ export function FileTree({ data, onFileSelect, searchQuery = "", isFullscreen = 
   const sortNodes = (nodes: TreeNode[]): TreeNode[] => {
     return [...nodes].sort((a, b) => {
       // Directories come first
-      if (a.type === "directory" && b.type === "file") return -1;
-      if (a.type === "file" && b.type === "directory") return 1;
+      if (a.type === "directory" && b.type === "file") {return -1;}
+      if (a.type === "file" && b.type === "directory") {return 1;}
       // Then sort alphabetically
       return a.name.localeCompare(b.name);
     });
@@ -49,12 +49,12 @@ export function FileTree({ data, onFileSelect, searchQuery = "", isFullscreen = 
   const filterNodes = (node: TreeNode): TreeNode | null => {
     const query = searchQuery.toLowerCase();
     
-    if (!query) return node;
+    if (!query) {return node;}
     
     if (node.type === "file") {
       // Check if file name or path matches
       if (node.name.toLowerCase().includes(query) || 
-          (node.path && node.path.toLowerCase().includes(query))) {
+          (node.path?.toLowerCase().includes(query))) {
         return node;
       }
       return null;
@@ -64,7 +64,7 @@ export function FileTree({ data, onFileSelect, searchQuery = "", isFullscreen = 
     if (node.children) {
       const filteredChildren = node.children
         .map(child => filterNodes(child))
-        .filter(child => child !== null) as TreeNode[];
+        .filter(child => child !== null);
       
       if (filteredChildren.length > 0) {
         return {
@@ -103,7 +103,7 @@ export function FileTree({ data, onFileSelect, searchQuery = "", isFullscreen = 
   const renderNode = (node: TreeNode, path = "", depth = 0) => {
     // Apply filter
     const filteredNode = filterNodes(node);
-    if (searchQuery && !filteredNode) return null;
+    if (searchQuery && !filteredNode) {return null;}
     const currentPath = path ? `${path}/${node.name}` : node.name;
     const isExpanded = expandedNodes.has(currentPath);
     const isSelected = selectedPath === node.path;
@@ -159,7 +159,7 @@ export function FileTree({ data, onFileSelect, searchQuery = "", isFullscreen = 
 
   const filteredData = searchQuery ? filterNodes(data) : data;
   
-  if (searchQuery && (!filteredData || !filteredData.children || filteredData.children.length === 0)) {
+  if (searchQuery && (!filteredData?.children || filteredData.children.length === 0)) {
     return (
       <div className={`${isFullscreen ? "flex-1" : "h-[400px]"} w-full overflow-auto rounded-lg border border-gray-700 bg-gray-900 flex items-center justify-center`}>
         <div className="text-gray-400 text-center">

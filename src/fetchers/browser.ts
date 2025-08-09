@@ -36,7 +36,7 @@ export function createBrowserFetch(): FetchFunction {
         throw error;
       }
       throw new HTTPError(url, undefined, {
-        message: error.message,
+        message: (error as Error).message,
       });
     }
   };

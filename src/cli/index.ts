@@ -245,7 +245,7 @@ async function main() {
     logger.info(`=== Extraction Complete ===`);
     logger.info(`  Total files extracted: ${result.stats.totalFiles}`);
     logger.info(`  Total size: ${formatBytes(result.stats.totalSize)}`);
-    logger.info(`  Duration: ${((result.stats.duration || 0) / 1000).toFixed(2)}s`);
+    logger.info(`  Duration: ${((result.stats.duration ?? 0) / 1000).toFixed(2)}s`);
 
     // Display errors if any
     displayErrors(result);
@@ -278,4 +278,11 @@ async function main() {
 }
 
 // Run the main function
-main();
+main().catch((error) => {
+  logger.error(`Unexpected error: ${formatError(error)}`);
+  if (args.verbose && error instanceof Error) {
+    console.error("\nStack trace:");
+    console.error(error.stack);
+  }
+  process.exit(1);
+});

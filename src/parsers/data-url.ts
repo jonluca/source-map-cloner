@@ -81,7 +81,7 @@ export default function parseDataUrl(stringInput: string): any {
 
   try {
     parsedUrl = new URL(stringInput);
-  } catch (error) {
+  } catch {
     return null;
   }
 

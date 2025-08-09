@@ -12,13 +12,13 @@ export function createNodeFetch(): FetchFunction {
   ): Promise<{ body: string; statusCode: number; requestUrl: string }> {
     try {
       const response = await gotClient(url, {
-        headers: options?.headers || {},
+        headers: options?.headers ?? {},
         agent,
         responseType: "text",
       });
 
       return {
-        body: response.body as string,
+        body: response.body,
         statusCode: response.statusCode,
         requestUrl: response.requestUrl.href,
       };

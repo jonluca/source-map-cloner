@@ -38,28 +38,26 @@ export interface CloneResult {
   /**
    * Any errors encountered during processing
    */
-  errors: Array<{
+  errors: {
     url?: string;
     file?: string;
     error: string;
-  }>;
+  }[];
 }
 
 /**
  * Fetch function interface for HTTP requests
  */
-export interface FetchFunction {
-  (
+export type FetchFunction = (
     url: string,
     options?: {
       headers?: Record<string, string>;
     },
-  ): Promise<{
+  ) => Promise<{
     body: string;
     statusCode: number;
     requestUrl: string;
   }>;
-}
 
 /**
  * Options for source map cloning

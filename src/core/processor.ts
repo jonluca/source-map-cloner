@@ -12,7 +12,7 @@ import { createBrowserFetch } from "../fetchers/browser";
  * Fetch and parse a JavaScript file for source maps
  */
 async function fetchAndParseJsFile(url: string, options: SourceMapClonerOptions): Promise<SourceFile[]> {
-  const { verbose, headers, fetch, logger } = options;
+  const { verbose, headers, fetch } = options;
 
   try {
     const { body: data } = await fetch(url, { headers });
@@ -128,13 +128,13 @@ export async function fetchAndWriteSourcesForUrl(
  */
 export async function cloneSourceMaps(options: CloneOptions): Promise<CloneResult> {
   const startTime = Date.now();
-  const urls = (Array.isArray(options.urls) ? options.urls : [options.urls]) as [string, ...string[]];
+  const urls = Array.isArray(options.urls) ? options.urls : [options.urls];
 
   if (urls.length === 0) {
     throw new Error("No URLs provided");
   }
 
-  const firstUrl = urls[0];
+  const firstUrl = urls[0]!;
   let baseUrl: URL;
 
   try {
@@ -206,21 +206,25 @@ async function crawlAndProcess(urls: string[], options: SourceMapClonerOptions, 
     const crawler = new Crawler({
       maxConnections: 10,
       headers: options.headers,
-      callback(error, res, done: any) {
+      callback(error, res, done) {
         if (error || !res?.$) {
+          // @ts-ignore
           done();
           return;
         }
 
         const baseUrl = options.baseUrl!;
         const anchorTags = res.$("a");
-        const foundUrls = (Array.from(anchorTags) as any[])
+
+        const foundUrls = Array.from(anchorTags)
+          // @ts-ignore
           .map((tag) => tag.attribs?.href)
-          .filter((href) => href && (href.startsWith(baseUrl.href) || href.startsWith("/")));
+          .filter(Boolean)
+          .filter((href) => href && (href.startsWith(baseUrl.href) || href.startsWith("/"))) as string[];
 
         const uniqueUrls = [
           ...new Set(
-            foundUrls.map((href) => {
+            foundUrls.map((href: string) => {
               const url = new URL(href.startsWith("/") ? `${baseUrl.origin}${href}` : href);
               url.hash = "";
               url.search = "";
@@ -238,6 +242,7 @@ async function crawlAndProcess(urls: string[], options: SourceMapClonerOptions, 
         });
 
         // Also process the current page
+
         for (const uri of [res?.options?.uri, res?.options?.url]) {
           if (uri && !crawledUrls.has(uri)) {
             crawledUrls.add(uri);
@@ -245,6 +250,7 @@ async function crawlAndProcess(urls: string[], options: SourceMapClonerOptions, 
           }
         }
 
+        // @ts-ignore
         done();
       },
     });
@@ -257,6 +263,7 @@ async function crawlAndProcess(urls: string[], options: SourceMapClonerOptions, 
         }
         resolve();
       } catch (error) {
+        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
         reject(error);
       }
     });
@@ -272,4 +279,3 @@ async function crawlAndProcess(urls: string[], options: SourceMapClonerOptions, 
 export type { CloneOptions, CloneResult, SourceMapClonerOptions, SourceFile, FetchFunction } from "./types";
 
 export { createBrowserFetch };
-export default cloneSourceMaps;

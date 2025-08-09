@@ -4,10 +4,10 @@ import type { Logger } from "../core/types";
  * No-op logger that discards all messages
  */
 export const noopLogger: Logger = {
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-  debug: () => {},
+  info: () => undefined,
+  warn: () => undefined,
+  error: () => undefined,
+  debug: () => undefined,
 };
 
 /**
