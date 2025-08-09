@@ -7118,7 +7118,7 @@ __metadata:
     vm2: "npm:^3.9.19"
     yargs: "npm:^18.0.0"
   bin:
-    source-map-cloner: dist/cli/index.js
+    source-map-cloner: dist/src/cli/index.js
   languageName: unknown
   linkType: soft
 
