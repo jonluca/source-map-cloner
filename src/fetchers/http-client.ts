@@ -4,7 +4,6 @@ import https from "https";
 import * as http from "node:http";
 import type { Got } from "got";
 import got from "got";
-import logger from "../utils/logger.js";
 
 // TLS cipher configuration for better compatibility
 const TLS_CIPHERS = [
@@ -61,13 +60,6 @@ export const gotClient: Got = got.extend({
     request: HTTP_TIMEOUT,
   },
   hooks: {
-    beforeRetry: [
-      (error, retryCount) => {
-        logger.warn(
-          `Retrying request (attempt ${retryCount}): ${error.message}`,
-        );
-      },
-    ],
     beforeError: [
       (error) => {
         const { response } = error;
