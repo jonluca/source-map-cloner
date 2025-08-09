@@ -18,6 +18,10 @@
     "./fetchers": {
       "import": "./dist/fetchers/index.js",
       "types": "./dist/fetchers/index.d.ts"
+    },
+    "./src/*": {
+      "import": "./src/*",
+      "types": "./src/index.d.ts"
     }
   },
   "scripts": {

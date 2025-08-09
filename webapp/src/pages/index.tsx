@@ -2,42 +2,84 @@ import { useState } from "react";
 import Head from "next/head";
 import { api } from "~/utils/api";
 import JSZip from "jszip";
+import { FileTree } from "~/components/FileTree";
+import dynamic from "next/dynamic";
+
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+});
+
+function getLanguageFromPath(path: string): string {
+  const ext = path.split(".").pop()?.toLowerCase();
+  switch (ext) {
+    case "js":
+    case "jsx":
+      return "javascript";
+    case "ts":
+    case "tsx":
+      return "typescript";
+    case "css":
+      return "css";
+    case "scss":
+    case "sass":
+      return "scss";
+    case "json":
+      return "json";
+    case "html":
+      return "html";
+    case "xml":
+      return "xml";
+    case "md":
+      return "markdown";
+    case "py":
+      return "python";
+    case "java":
+      return "java";
+    case "c":
+    case "cpp":
+    case "cc":
+      return "cpp";
+    case "cs":
+      return "csharp";
+    case "go":
+      return "go";
+    case "rs":
+      return "rust";
+    case "php":
+      return "php";
+    case "rb":
+      return "ruby";
+    case "swift":
+      return "swift";
+    case "kt":
+      return "kotlin";
+    case "yaml":
+    case "yml":
+      return "yaml";
+    default:
+      return "plaintext";
+  }
+}
 
 export default function Home() {
   const [url, setUrl] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{
-    fileCount: number;
-    files: Array<{ path: string; content: string }>;
-  } | null>(null);
+  const [selectedFile, setSelectedFile] = useState<{ path: string; content: string } | null>(null);
 
-  const fetchSourceMap = api.sourceMap.fetchSourceMap.useMutation({
-    onSuccess: (data) => {
-      setResult(data);
-      setError(null);
-      setIsLoading(false);
-    },
-    onError: (error) => {
-      setError(error.message);
-      setResult(null);
-      setIsLoading(false);
-    },
-  });
+  const { data: result, isPending: isLoading, error, mutate } = api.sourceMap.fetchSourceMap.useMutation({});
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url) return;
+    if (!url) {
+      return;
+    }
 
-    setIsLoading(true);
-    setError(null);
-    setResult(null);
-
-    fetchSourceMap.mutate({ url });
+    mutate({ url });
   };
 
   const downloadFiles = async () => {
-    if (!result || !result.files) return;
+    if (!result?.files) {
+      return;
+    }
 
     const zip = new JSZip();
 
@@ -124,14 +166,17 @@ export default function Home() {
 
               {error && (
                 <div className="mt-6 rounded-lg border border-red-500 bg-red-900/50 p-4">
-                  <p className="text-red-300">Error: {error}</p>
+                  <p className="text-red-300">Error: {String(error)}</p>
                 </div>
               )}
 
               {result && (
                 <div className="mt-6 space-y-4">
                   <div className="rounded-lg border border-green-500 bg-green-900/50 p-4">
-                    <p className="text-green-300">Successfully extracted {result.fileCount} source files!</p>
+                    <p className="text-green-300">Successfully extracted {result.stats.totalFiles} source files!</p>
+                    <p className="mt-1 text-sm text-green-300">
+                      Total size: {(result.stats.totalSize / 1024).toFixed(2)} KB
+                    </p>
                   </div>
 
                   <button
@@ -142,17 +187,65 @@ export default function Home() {
                   </button>
 
                   <div className="mt-6">
-                    <h3 className="mb-3 text-lg font-semibold text-gray-300">Extracted Files:</h3>
-                    <div className="max-h-96 overflow-y-auto rounded-lg border border-gray-700 bg-gray-900 p-4">
-                      <ul className="space-y-1">
-                        {result.files.map((file, index) => (
-                          <li key={index} className="font-mono text-sm text-gray-400">
-                            {file.path}
-                          </li>
-                        ))}
-                      </ul>
+                    <h3 className="mb-3 text-lg font-semibold text-gray-300">File Browser:</h3>
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                      <div>
+                        <h4 className="mb-2 text-sm font-medium text-gray-400">Directory Structure</h4>
+                        <FileTree
+                          data={result.directoryStructure}
+                          onFileSelect={(path) => {
+                            const file = result.files.find((f) => f.path === path);
+                            if (file) {
+                              setSelectedFile({ path: file.path, content: file.content });
+                            }
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <h4 className="mb-2 text-sm font-medium text-gray-400">File Preview</h4>
+                        {selectedFile ? (
+                          <div className="overflow-hidden rounded-lg border border-gray-700 bg-gray-900">
+                            <div className="border-b border-gray-700 bg-gray-800 px-4 py-2 font-mono text-sm text-gray-400">
+                              {selectedFile.path}
+                            </div>
+                            <MonacoEditor
+                              height="400px"
+                              language={getLanguageFromPath(selectedFile.path)}
+                              theme="vs-dark"
+                              value={selectedFile.content}
+                              options={{
+                                readOnly: true,
+                                minimap: { enabled: false },
+                                scrollBeyondLastLine: false,
+                                fontSize: 13,
+                                wordWrap: "on",
+                                automaticLayout: true,
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex h-[400px] items-center justify-center rounded-lg border border-gray-700 bg-gray-900">
+                            <p className="text-gray-500">Select a file to preview</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
+
+                  {result.errors.length > 0 && (
+                    <div className="mt-6">
+                      <h3 className="mb-3 text-lg font-semibold text-yellow-300">Warnings:</h3>
+                      <div className="rounded-lg border border-yellow-500 bg-yellow-900/20 p-4">
+                        <ul className="space-y-1 text-sm text-yellow-300">
+                          {result.errors.map((error, index) => (
+                            <li key={index}>
+                              {error.file ?? error.url}: {error.error}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

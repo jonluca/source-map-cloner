@@ -3,16 +3,7 @@ import prettierPlugin from "eslint-plugin-prettier";
 import unusedImportsPlugin from "eslint-plugin-unused-imports";
 import prettierExtends from "eslint-config-prettier";
 import { fixupPluginRules } from "@eslint/compat";
-import globals from "globals";
 import tseslint from "typescript-eslint";
-
-const globalToUse = {
-  ...globals.browser,
-  ...globals.serviceworker,
-  ...globals.es2021,
-  ...globals.worker,
-  ...globals.node,
-};
 
 export default tseslint.config({
   extends: [
@@ -23,6 +14,8 @@ export default tseslint.config({
         "public/js/*",
         "runs/*",
         "dist/*",
+        ".next/*",
+        "webapp/.next/*",
         "webapp/node_modules/*",
         ".yarn/js/*",
         "ui/out/**/*",
@@ -47,6 +40,7 @@ export default tseslint.config({
     "@typescript-eslint/no-use-before-define": "off",
     "prefer-const": "error",
     curly: ["error", "all"],
+    "@typescript-eslint/no-base-to-string": "off",
     "no-async-promise-executor": "off",
     "@typescript-eslint/no-this-alias": "off",
     "@typescript-eslint/no-non-null-assertion": "off",
@@ -76,7 +70,6 @@ export default tseslint.config({
     ],
   },
   languageOptions: {
-    globals: globalToUse,
     parserOptions: {
       ecmaFeatures: {
         jsx: true,

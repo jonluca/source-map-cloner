@@ -5,7 +5,7 @@ import { getSourceMappingURL } from "./source-map-utils.js";
 import { fetchFromURL } from "../fetchers/utils.js";
 import { InvalidURLError } from "../utils/errors.js";
 import { noopLogger } from "../utils/default-logger.js";
-import type { CloneOptions, CloneResult, SourceMapClonerOptions, SourceFile, Logger } from "./types.js";
+import type { CloneOptions, CloneResult, SourceMapClonerOptions, SourceFile } from "./types.js";
 import { createBrowserFetch } from "../fetchers/browser.js";
 
 /**
