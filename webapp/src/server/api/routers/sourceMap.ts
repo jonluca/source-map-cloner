@@ -16,6 +16,7 @@ export const sourceMapRouter = createTRPCRouter({
         const result = await cloneSourceMaps({
           urls: [input.url],
           fetch: createNodeFetch(),
+          cleanupKnownInvalidFiles: true,
         });
 
         // Transform Map to array and build directory structure

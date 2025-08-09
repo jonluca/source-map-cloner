@@ -171,6 +171,21 @@ export async function cloneSourceMaps(options: CloneOptions): Promise<CloneResul
     }
   }
 
+  if (options.cleanupKnownInvalidFiles) {
+    // we want to remove root files that start with a question mark, which are likely invalid
+    // and remove all webpack/runtime files and webpack/bootstrap
+    for (const [filePath, content] of result.files.entries()) {
+      if (filePath.startsWith("?")) {
+        result.files.delete(filePath);
+        result.stats.totalSize -= content.length;
+      }
+      if (filePath.includes("webpack/runtime") || filePath.includes("webpack/bootstrap")) {
+        result.files.delete(filePath);
+        result.stats.totalSize -= content.length;
+      }
+    }
+  }
+
   // Update final stats
   result.stats.totalFiles = result.files.size;
   result.stats.duration = Date.now() - startTime;

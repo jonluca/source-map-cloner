@@ -1,218 +1,239 @@
 # Source Map Cloner
 
-Extract and reconstruct original source files from production JavaScript source maps. This tool fetches source maps from websites and recreates the original file structure locally, making it invaluable for debugging minified code, security research, and understanding how production applications are built.
+A powerful TypeScript library and CLI tool for extracting and cloning source files from JavaScript source maps. Useful for analyzing minified JavaScript code by recovering the original source files.
 
 ## Features
 
-- 🔍 **Automatic Source Map Detection** - Finds and extracts source maps from JavaScript files
-- 🕷️ **Web Crawling** - Recursively discover and process all JavaScript files on a site
-- 📁 **Original Structure Preservation** - Maintains the original directory structure of source files
-- 🚀 **Concurrent Processing** - Fast parallel fetching with configurable concurrency
-- 📦 **Multiple URL Support** - Process multiple URLs in a single run
-- 🔧 **Flexible Usage** - Use as a CLI tool or Node.js/Browser library
-- 🌐 **Isomorphic** - Works in both Node.js and browser environments
-- 💾 **In-Memory Processing** - All operations work in memory, file writing is optional
-- 🎯 **Next.js Support** - Special handling for Next.js build manifests
-- 🛡️ **Security Features** - Path traversal protection and header customization
+- 🔍 **Source Map Extraction**: Automatically discovers and extracts source maps from JavaScript files
+- 🌐 **Multiple URL Support**: Process single URLs or crawl entire sites
+- 📁 **Structure Preservation**: Maintains original directory structure when extracting files
+- 🚀 **TypeScript First**: Written in TypeScript with full type definitions
+- 🔌 **Flexible Fetchers**: Built-in Node.js and browser-compatible HTTP fetchers
+- 📦 **Programmatic API**: Use as a library in your own projects
+- 🛠️ **CLI Tool**: Ready-to-use command-line interface
 
 ## Installation
-
-### Global CLI Installation
-
-```bash
-npm install -g source-map-cloner
-```
-
-### As a Project Dependency
 
 ```bash
 npm install source-map-cloner
 # or
 yarn add source-map-cloner
-```
-
-### Development Setup
-
-```bash
-git clone https://github.com/yourusername/source-map-cloner.git
-cd source-map-cloner
-yarn install
-yarn build
+# or
+pnpm add source-map-cloner
 ```
 
 ## Usage
 
 ### CLI Usage
 
-#### Basic Usage
-
 ```bash
-# Fetch source maps from a single URL
-source-map-cloner -u https://example.com
+# Basic usage - extract source maps from a URL
+npx source-map-cloner https://example.com output-directory
 
-# Specify output directory
-source-map-cloner -u https://example.com -d ./output
+# Multiple URLs
+npx source-map-cloner -u https://example.com -u https://another.com output-dir
 
-# Process multiple URLs
-source-map-cloner -u https://example.com -u https://example.com/page2
+# Enable crawling to discover linked pages
+npx source-map-cloner --crawl https://example.com output-dir
 
-# Enable crawling to discover all pages
-source-map-cloner -u https://example.com --crawl
+# Custom headers for authentication
+npx source-map-cloner --header "Authorization: Bearer token" https://example.com output-dir
 
-# Preserve URL paths in output structure
-source-map-cloner -u https://example.com --urlPathBasedSaving
-
-# Add custom headers (useful for authentication)
-source-map-cloner -u https://example.com -H "Authorization: Bearer token" -H "Cookie: session=abc"
-
-# Verbose output for debugging
-source-map-cloner -u https://example.com --verbose
+# Custom user agent
+npx source-map-cloner --user-agent "MyBot 1.0" https://example.com output-dir
 ```
 
-#### CLI Options
+### Programmatic API
 
-| Option                 | Alias | Description                                         | Default       |
-| ---------------------- | ----- | --------------------------------------------------- | ------------- |
-| `--url`                | `-u`  | URL(s) to process (can be specified multiple times) | Required      |
-| `--dir`                | `-d`  | Output directory for extracted files                | Site hostname |
-| `--crawl`              | `-c`  | Enable crawling to discover linked pages            | `false`       |
-| `--urlPathBasedSaving` | `-p`  | Include URL path in directory structure             | `false`       |
-| `--headers`            | `-H`  | HTTP headers in "Name: Value" format                | `[]`          |
-| `--verbose`            | `-v`  | Enable verbose logging                              | `false`       |
-
-### Library Usage
-
-#### Basic Example (Node.js)
-
-```javascript
-import cloneSourceMaps from "source-map-cloner";
-import { createNodeFetch } from "source-map-cloner/node-fetch";
-
-// Extract source maps into memory
-const result = await cloneSourceMaps({
-  urls: "https://example.com",
-  fetch: createNodeFetch(), // Required: provide fetch implementation
-  verbose: true,
-});
-
-// Access extracted files
-console.log(`Extracted ${result.stats.totalFiles} files`);
-for (const [path, content] of result.files) {
-  console.log(`File: ${path}, Size: ${content.length} bytes`);
-}
-
-// Write files to disk
-import fs from "fs/promises";
-import path from "path";
-for (const [filePath, content] of result.files) {
-  const fullPath = path.join("./output", filePath);
-  await fs.writeFile(fullPath, content);
-}
-```
-
-#### TypeScript Support
+#### Basic Example with Node.js Fetcher
 
 ```typescript
-import cloneSourceMaps, { CloneOptions, CloneResult, FetchFunction } from "source-map-cloner";
-import { createNodeFetch } from "source-map-cloner/node-fetch";
+import { cloneSourceMaps, createNodeFetch, createConsoleLogger } from 'source-map-cloner';
+import { createNodeFetch } from 'source-map-cloner/fetchers';
 
-const options: CloneOptions = {
-  urls: "https://example.com",
-  fetch: createNodeFetch(), // Required: provide fetch implementation
-  crawl: false,
-  urlPathBasedSaving: true,
-  verbose: true,
-  headers: {
-    Cookie: "session=abc123",
-  },
-};
+async function example() {
+  const result = await cloneSourceMaps({
+    urls: 'https://example.com',
+    fetch: createNodeFetch(),
+    logger: createConsoleLogger(),
+  });
 
-const result: CloneResult = await cloneSourceMaps(options);
+  console.log(`Extracted ${result.stats.totalFiles} files`);
+  console.log(`Total size: ${result.stats.totalSize} bytes`);
 
-// Access results
-result.files.forEach((content, path) => {
-  console.log(`${path}: ${content.length} bytes`);
-});
+  // Access extracted files
+  for (const [path, content] of result.files) {
+    console.log(`File: ${path}, Size: ${content.length} bytes`);
+  }
+}
+```
 
-// Check for errors
-if (result.errors.length > 0) {
-  console.error("Errors encountered:", result.errors);
+#### Advanced Example with Custom Options
+
+```typescript
+import { cloneSourceMaps, createConsoleLogger } from 'source-map-cloner';
+import { createNodeFetch } from 'source-map-cloner/fetchers';
+
+async function advancedExample() {
+  const fetch = createNodeFetch({
+    headers: {
+      'User-Agent': 'MyBot/1.0',
+      'Authorization': 'Bearer token'
+    }
+  });
+
+  const result = await cloneSourceMaps({
+    urls: ['https://example.com', 'https://another.com'],
+    fetch,
+    logger: createConsoleLogger(),
+    crawl: true,
+    verbose: true,
+    headers: {
+      'Accept-Language': 'en-US'
+    }
+  });
+
+  // Handle errors
+  if (result.errors.length > 0) {
+    console.error('Errors encountered:');
+    for (const error of result.errors) {
+      console.error(`- ${error.error} (URL: ${error.url || 'N/A'})`);
+    }
+  }
 }
 ```
 
 #### Browser Usage
 
-```javascript
-import cloneSourceMaps from "source-map-cloner";
-import { createBrowserFetch } from "source-map-cloner/browser-fetch";
+```typescript
+import { cloneSourceMaps, noopLogger } from 'source-map-cloner';
+import { createBrowserFetch } from 'source-map-cloner/fetchers';
 
-// Provide the browser fetch implementation
-const result = await cloneSourceMaps({
-  urls: "https://example.com",
-  fetch: createBrowserFetch(), // Uses browser's native fetch API
-  verbose: false, // Logging might not work in browser
-});
-
-// Process results in browser
-console.log("Files extracted:", result.stats.totalFiles);
-// You could display files, create a zip, etc.
-
-// Alternative: Custom fetch implementation
-const customFetch = async (url, options) => {
-  const response = await fetch(url, {
-    headers: options?.headers,
-    mode: "cors",
+async function browserExample() {
+  const result = await cloneSourceMaps({
+    urls: 'https://example.com',
+    fetch: createBrowserFetch(),
+    logger: noopLogger, // Silent logger for browser environments
   });
-  return {
-    body: await response.text(),
-    statusCode: response.status,
-    requestUrl: response.url,
-  };
+
+  // Process results...
+}
+```
+
+#### Custom Logger Implementation
+
+```typescript
+import { cloneSourceMaps, Logger } from 'source-map-cloner';
+import { createNodeFetch } from 'source-map-cloner/fetchers';
+
+const customLogger: Logger = {
+  info: (msg) => console.log(`[INFO] ${msg}`),
+  warn: (msg) => console.warn(`[WARN] ${msg}`),
+  error: (msg) => console.error(`[ERROR] ${msg}`),
+  debug: (msg) => console.debug(`[DEBUG] ${msg}`),
 };
 
-const result2 = await cloneSourceMaps({
-  urls: "https://example.com",
-  fetch: customFetch,
+const result = await cloneSourceMaps({
+  urls: 'https://example.com',
+  fetch: createNodeFetch(),
+  logger: customLogger,
 });
+```
+
+#### Using the Default Node Fetcher
+
+The `createNodeFetch` function creates a Node.js-compatible fetcher using the `got` library with sensible defaults:
+
+```typescript
+import { createNodeFetch } from 'source-map-cloner/fetchers';
+
+// Basic usage with default options
+const fetch = createNodeFetch();
+
+// With custom headers
+const fetchWithAuth = createNodeFetch({
+  headers: {
+    'Authorization': 'Bearer token',
+    'User-Agent': 'MyApp/1.0'
+  }
+});
+
+// The fetcher automatically handles:
+// - HTTP/2 support
+// - Cookie jar management
+// - Custom cipher configuration for compatibility
+// - Automatic retries on network failures
+// - Proper encoding handling
 ```
 
 ## API Reference
 
-### `cloneSourceMaps(options: CloneOptions): Promise<CloneResult>`
+### Main Functions
 
-Main function to clone source maps from one or more URLs. Returns all extracted files in memory.
+#### `cloneSourceMaps(options: CloneOptions): Promise<CloneResult>`
 
-#### CloneOptions
+Main function to clone source maps from URLs.
 
-| Property             | Type                     | Required | Description                            |
-| -------------------- | ------------------------ | -------- | -------------------------------------- |
-| `urls`               | `string \| string[]`     | Yes      | URL(s) to process                      |
-| `fetch`              | `FetchFunction`          | Yes      | Fetch implementation for HTTP requests |
-| `crawl`              | `boolean`                | No       | Enable web crawling                    |
-| `urlPathBasedSaving` | `boolean`                | No       | Preserve URL paths in output           |
-| `headers`            | `Record<string, string>` | No       | Custom HTTP headers                    |
-| `verbose`            | `boolean`                | No       | Enable verbose logging                 |
+**Options:**
+- `urls`: Single URL string or array of URLs to process
+- `fetch`: Fetch function for HTTP requests (use `createNodeFetch()` or `createBrowserFetch()`)
+- `logger?`: Optional logger instance (defaults to no-op logger)
+- `crawl?`: Enable crawling to discover linked pages
+- `headers?`: Additional HTTP headers
+- `verbose?`: Enable verbose logging
 
-#### CloneResult
+**Returns:** `CloneResult` with extracted files, statistics, and errors
 
-| Property | Type                  | Description                                        |
-| -------- | --------------------- | -------------------------------------------------- |
-| `files`  | `Map<string, string>` | Map of file paths to their contents                |
-| `stats`  | `object`              | Statistics (totalFiles, totalSize, urls, duration) |
-| `errors` | `Array`               | Array of errors encountered during processing      |
+### Fetchers
 
-### `FetchFunction` Interface
+#### `createNodeFetch(options?)`
 
-The fetch function must implement the following interface:
+Creates a Node.js-compatible fetch function using `got`.
+
+**Options:**
+- `headers?`: Default headers to include with all requests
+
+#### `createBrowserFetch()`
+
+Creates a browser-compatible fetch function using the native Fetch API.
+
+### Logger Utilities
+
+#### `createConsoleLogger()`
+
+Creates a logger that outputs to the console.
+
+#### `noopLogger`
+
+A silent logger that discards all output (useful for production or browser environments).
+
+### Types
 
 ```typescript
+interface CloneResult {
+  files: Map<string, string>;  // Map of file paths to contents
+  stats: {
+    totalFiles: number;
+    totalSize: number;
+    urls: string[];
+    duration?: number;
+  };
+  errors: Array<{
+    url?: string;
+    file?: string;
+    error: string;
+  }>;
+}
+
+interface Logger {
+  info: (message: string) => void;
+  warn: (message: string) => void;
+  error: (message: string) => void;
+  debug?: (message: string) => void;
+}
+
 interface FetchFunction {
-  (
-    url: string,
-    options?: {
-      headers?: Record<string, string>;
-    },
-  ): Promise<{
+  (url: string, options?: { headers?: Record<string, string> }): Promise<{
     body: string;
     statusCode: number;
     requestUrl: string;

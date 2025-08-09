@@ -81,6 +81,7 @@ export interface CloneOptions {
   fetch: FetchFunction;
   logger?: Logger;
   crawl?: boolean;
+  cleanupKnownInvalidFiles?: boolean;
   headers?: Record<string, string>;
   verbose?: boolean;
 }
