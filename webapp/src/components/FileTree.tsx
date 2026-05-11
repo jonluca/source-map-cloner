@@ -14,6 +14,32 @@ interface FileTreeProps {
   isFullscreen?: boolean;
 }
 
+function sortNodes(nodes: TreeNode[]): TreeNode[] {
+  return nodes.toSorted((a, b) => {
+    if (a.type === "directory" && b.type === "file") {
+      return -1;
+    }
+    if (a.type === "file" && b.type === "directory") {
+      return 1;
+    }
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function expandAll(node: TreeNode, path = ""): string[] {
+  const currentPath = path ? `${path}/${node.name}` : node.name;
+  const paths: string[] = [];
+
+  if (node.type === "directory" && node.children) {
+    paths.push(currentPath);
+    node.children.forEach((child) => {
+      paths.push(...expandAll(child, currentPath));
+    });
+  }
+
+  return paths;
+}
+
 export function FileTree({ data, onFileSelect, searchQuery = "", isFullscreen = false }: FileTreeProps) {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -33,20 +59,6 @@ export function FileTree({ data, onFileSelect, searchQuery = "", isFullscreen = 
     if (onFileSelect) {
       onFileSelect(path);
     }
-  };
-
-  const sortNodes = (nodes: TreeNode[]): TreeNode[] => {
-    return [...nodes].sort((a, b) => {
-      // Directories come first
-      if (a.type === "directory" && b.type === "file") {
-        return -1;
-      }
-      if (a.type === "file" && b.type === "directory") {
-        return 1;
-      }
-      // Then sort alphabetically
-      return a.name.localeCompare(b.name);
-    });
   };
 
   // Filter nodes based on search query
@@ -83,21 +95,6 @@ export function FileTree({ data, onFileSelect, searchQuery = "", isFullscreen = 
   // Auto-expand all nodes when searching
   useEffect(() => {
     if (searchQuery) {
-      // Expand all directories when searching
-      const expandAll = (node: TreeNode, path = ""): string[] => {
-        const currentPath = path ? `${path}/${node.name}` : node.name;
-        const paths: string[] = [];
-
-        if (node.type === "directory" && node.children) {
-          paths.push(currentPath);
-          node.children.forEach((child) => {
-            paths.push(...expandAll(child, currentPath));
-          });
-        }
-
-        return paths;
-      };
-
       const allPaths = data.children ? data.children.flatMap((child) => expandAll(child)) : [];
       setExpandedNodes(new Set(allPaths));
     }
@@ -115,8 +112,10 @@ export function FileTree({ data, onFileSelect, searchQuery = "", isFullscreen = 
 
     return (
       <div key={currentPath}>
-        <div
-          className={`flex cursor-pointer items-center px-2 py-1 hover:bg-gray-800 ${isSelected ? "bg-gray-800" : ""}`}
+        <button
+          type="button"
+          aria-expanded={node.type === "directory" ? isExpanded : undefined}
+          className={`flex w-full cursor-pointer items-center px-2 py-1 text-left hover:bg-gray-800 ${isSelected ? "bg-gray-800" : ""}`}
           style={{ paddingLeft: `${depth * 20 + 8}px` }}
           onClick={() => {
             if (node.type === "directory") {
@@ -150,7 +149,7 @@ export function FileTree({ data, onFileSelect, searchQuery = "", isFullscreen = 
           <span className={`text-sm ${node.type === "file" ? "text-gray-300" : "font-medium text-gray-400"}`}>
             {node.name}
           </span>
-        </div>
+        </button>
         {node.type === "directory" && isExpanded && node.children && (
           <div>{sortNodes(node.children).map((child) => renderNode(child, currentPath, depth + 1))}</div>
         )}

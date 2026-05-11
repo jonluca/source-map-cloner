@@ -165,7 +165,7 @@ class TopDomainTester {
       "=== Top domains with source maps ===",
       ...this.results
         .filter((r) => r.sourceMapsFound)
-        .sort((a, b) => b.filesExtracted - a.filesExtracted)
+        .toSorted((a, b) => b.filesExtracted - a.filesExtracted)
         .slice(0, 20)
         .map((r) => `${r.domain}: ${r.filesExtracted} files (${this.formatBytes(r.totalSize)})`),
     ].join("\n");
@@ -209,7 +209,7 @@ class TopDomainTester {
       console.log("\n=== Top 10 domains with source maps ===");
       this.results
         .filter((r) => r.sourceMapsFound)
-        .sort((a, b) => b.filesExtracted - a.filesExtracted)
+        .toSorted((a, b) => b.filesExtracted - a.filesExtracted)
         .slice(0, 10)
         .forEach((r) => {
           console.log(`  ${r.domain}: ${r.filesExtracted} files (${this.formatBytes(r.totalSize)})`);

@@ -303,9 +303,9 @@ export default function Home() {
                       <h3 className="mb-3 text-lg font-semibold text-yellow-300">Warnings:</h3>
                       <div className="rounded-lg border border-yellow-500 bg-yellow-900/20 p-4">
                         <ul className="space-y-1 text-sm text-yellow-300">
-                          {result.errors.map((error, index) => (
+                          {result.errors.map((sourceError, index) => (
                             <li key={index}>
-                              {error.file ?? error.url}: {error.error}
+                              {sourceError.file ?? sourceError.url}: {sourceError.error}
                             </li>
                           ))}
                         </ul>

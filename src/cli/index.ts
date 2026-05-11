@@ -145,7 +145,7 @@ if (args.verbose) {
 /**
  * Write files from the clone result to disk
  */
-async function writeFilesToDisk(result: CloneResult, outputDir: string, dryRun: boolean): Promise<void> {
+async function writeFilesToDisk(result: CloneResult, targetDir: string, dryRun: boolean): Promise<void> {
   if (dryRun) {
     logger.info("\n=== DRY RUN MODE - No files will be written ===\n");
   }
@@ -154,7 +154,7 @@ async function writeFilesToDisk(result: CloneResult, outputDir: string, dryRun: 
   let bytesWritten = 0;
 
   for (const [filePath, content] of result.files) {
-    const fullPath = path.join(outputDir, filePath);
+    const fullPath = path.join(targetDir, filePath);
 
     if (dryRun) {
       logger.info(`Would write: ${fullPath} (${content.length} bytes)`);

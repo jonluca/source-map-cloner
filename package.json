@@ -50,6 +50,7 @@
     "p-map": "^7.0.4",
     "source-map": "^0.7.6",
     "top-user-agents": "^2.1.111",
+    "tough-cookie": "^6.0.1",
     "vm2": "^3.11.3",
     "yargs": "^18.0.0"
   },
