@@ -42,7 +42,7 @@
   "files": [
     "tsconfig.json",
     "src",
-    "dist",
+    "dist/src",
     "README.md"
   ],
   "publishConfig": {

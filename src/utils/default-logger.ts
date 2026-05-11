@@ -1,4 +1,4 @@
-import type { Logger } from "../core/types";
+import type { Logger } from "../core/types.js";
 
 /**
  * No-op logger that discards all messages

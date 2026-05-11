@@ -48,7 +48,7 @@ npx source-map-cloner --user-agent "MyBot 1.0" https://example.com output-dir
 #### Basic Example with Node.js Fetcher
 
 ```typescript
-import { cloneSourceMaps, createNodeFetch, createConsoleLogger } from "source-map-cloner";
+import { cloneSourceMaps, createConsoleLogger } from "source-map-cloner";
 import { createNodeFetch } from "source-map-cloner/fetchers";
 
 async function example() {

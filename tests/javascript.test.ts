@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { cloneSourceMaps } from "../src/core/processor";
-import type { FetchFunction, Logger } from "../src/core/types";
-import { getSourceMappingURL } from "../src/core/source-map-utils";
-import { extractJsUrlsFromText, getFallbackSourceMapUrl } from "../src/parsers/javascript";
-import { processSourceMap } from "../src/parsers/source-map";
+import { cloneSourceMaps } from "../src/core/processor.js";
+import type { FetchFunction, Logger } from "../src/core/types.js";
+import { getSourceMappingURL } from "../src/core/source-map-utils.js";
+import { extractJsUrlsFromText, getFallbackSourceMapUrl } from "../src/parsers/javascript.js";
+import { processSourceMap } from "../src/parsers/source-map.js";
 
 const logger: Logger = {
   info: () => undefined,

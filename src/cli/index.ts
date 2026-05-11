@@ -4,10 +4,10 @@ import fs from "fs/promises";
 import { mkdirp } from "mkdirp";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { cloneSourceMaps, type CloneOptions, type CloneResult } from "../core/processor";
-import { createNodeFetch } from "../fetchers";
-import { InvalidURLError, formatError } from "../utils/errors";
-import { createConsoleLogger } from "../utils/default-logger";
+import { cloneSourceMaps, type CloneOptions, type CloneResult } from "../core/processor.js";
+import { createNodeFetch } from "../fetchers/index.js";
+import { InvalidURLError, formatError } from "../utils/errors.js";
+import { createConsoleLogger } from "../utils/default-logger.js";
 
 const logger = createConsoleLogger();
 // Setup global error handlers

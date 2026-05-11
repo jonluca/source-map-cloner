@@ -4,12 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "next build --turbo",
+    "build": "pnpm --dir .. build && next build --turbo",
     "check": "oxlint . && tsc --noEmit",
     "dev": "next dev --turbo",
     "lint": "oxlint .",
     "lint:fix": "oxlint . --fix",
-    "preview": "next build && next start",
+    "preview": "pnpm --dir .. build && next build && next start",
     "start": "next start",
     "typecheck": "tsc --noEmit"
   },

@@ -1,12 +1,12 @@
 import pMap from "p-map";
-import { processSourceMap } from "../parsers/source-map";
-import { discoverJavaScriptFiles, getFallbackSourceMapUrl } from "../parsers/javascript";
-import { getSourceMappingURL } from "./source-map-utils";
-import { fetchFromURL } from "../fetchers/utils";
-import { InvalidURLError } from "../utils/errors";
-import { noopLogger } from "../utils/default-logger";
-import type { CloneOptions, CloneResult, SourceMapClonerOptions, SourceFile } from "./types";
-import { createBrowserFetch } from "../fetchers/browser";
+import { processSourceMap } from "../parsers/source-map.js";
+import { discoverJavaScriptFiles, getFallbackSourceMapUrl } from "../parsers/javascript.js";
+import { getSourceMappingURL } from "./source-map-utils.js";
+import { fetchFromURL } from "../fetchers/utils.js";
+import { InvalidURLError } from "../utils/errors.js";
+import { noopLogger } from "../utils/default-logger.js";
+import type { CloneOptions, CloneResult, SourceMapClonerOptions, SourceFile } from "./types.js";
+import { createBrowserFetch } from "../fetchers/browser.js";
 import userAgents from "top-user-agents";
 
 /**
@@ -348,6 +348,6 @@ async function crawlAndProcess(urls: string[], options: SourceMapClonerOptions, 
 }
 
 // Re-export types for convenience
-export type { CloneOptions, CloneResult, SourceMapClonerOptions, SourceFile, FetchFunction } from "./types";
+export type { CloneOptions, CloneResult, SourceMapClonerOptions, SourceFile, FetchFunction } from "./types.js";
 
 export { createBrowserFetch };

@@ -1,5 +1,5 @@
-export { fetchAndWriteSourcesForUrl, cloneSourceMaps } from "./core/processor";
-export { noopLogger, createConsoleLogger } from "./utils/default-logger";
+export { fetchAndWriteSourcesForUrl, cloneSourceMaps } from "./core/processor.js";
+export { noopLogger, createConsoleLogger } from "./utils/default-logger.js";
 export type {
   CloneOptions,
   CloneResult,
@@ -7,4 +7,4 @@ export type {
   SourceFile,
   FetchFunction,
   Logger,
-} from "./core/types";
+} from "./core/types.js";

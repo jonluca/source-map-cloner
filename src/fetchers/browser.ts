@@ -1,5 +1,5 @@
-import type { FetchFunction } from "../core/types";
-import { HTTPError } from "../utils/errors";
+import type { FetchFunction } from "../core/types.js";
+import { HTTPError } from "../utils/errors.js";
 
 /**
  * Create a fetch function using the browser's fetch API

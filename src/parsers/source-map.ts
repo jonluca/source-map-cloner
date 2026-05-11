@@ -1,7 +1,7 @@
 import sourceMap, { type BasicSourceMapConsumer, type IndexedSourceMapConsumer } from "source-map";
-import { SourceMapParseError } from "../utils/errors";
-import { getOutputPath, normalizeSourcePath } from "../utils/paths";
-import type { SourceMapClonerOptions, SourceFile } from "../core/types";
+import { SourceMapParseError } from "../utils/errors.js";
+import { getOutputPath, normalizeSourcePath } from "../utils/paths.js";
+import type { SourceMapClonerOptions, SourceFile } from "../core/types.js";
 
 const { SourceMapConsumer } = sourceMap;
 
