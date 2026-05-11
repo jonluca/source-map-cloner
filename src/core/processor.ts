@@ -57,6 +57,47 @@ async function fetchAndParseJsFile(url: string, options: SourceMapClonerOptions)
   return [];
 }
 
+function addSourceFileToResult(file: SourceFile, options: SourceMapClonerOptions, result: CloneResult): void {
+  if (!result.files.has(file.path)) {
+    result.files.set(file.path, file.content);
+    result.stats.totalSize += file.content.length;
+    return;
+  }
+
+  const existingContent = result.files.get(file.path)!;
+
+  if (existingContent === file.content) {
+    if (options.verbose) {
+      options.logger.warn(`Duplicate file skipped: ${file.path}`);
+    }
+    return;
+  }
+
+  if (existingContent.length === 0 && file.content.length > 0) {
+    result.files.set(file.path, file.content);
+    result.stats.totalSize += file.content.length - existingContent.length;
+
+    if (options.verbose) {
+      options.logger.info(`Replaced empty duplicate source: ${file.path}`);
+    }
+    return;
+  }
+
+  if (file.content.length === 0) {
+    if (options.verbose) {
+      options.logger.warn(`Empty duplicate source skipped: ${file.path}`);
+    }
+    return;
+  }
+
+  const message = `Conflicting duplicate source content skipped: ${file.path}`;
+  result.errors.push({
+    file: file.path,
+    error: message,
+  });
+  options.logger.warn(message);
+}
+
 /**
  * Process a single URL to extract source maps
  */
@@ -102,13 +143,7 @@ export async function fetchAndWriteSourcesForUrl(
     // Flatten and add all files to the result
     for (const files of fileArrays) {
       for (const file of files) {
-        // Check for duplicates
-        if (!result.files.has(file.path)) {
-          result.files.set(file.path, file.content);
-          result.stats.totalSize += file.content.length;
-        } else if (options.verbose) {
-          options.logger.warn(`Duplicate file skipped: ${file.path}`);
-        }
+        addSourceFileToResult(file, options, result);
       }
     }
 

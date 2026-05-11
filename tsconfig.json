@@ -23,6 +23,7 @@
     "plugins": [{ "name": "next" }],
     "incremental": true,
     "forceConsistentCasingInFileNames": true,
+    "rootDir": ".",
     "outDir": "dist",
     "noImplicitAny": true,
     "experimentalDecorators": true,

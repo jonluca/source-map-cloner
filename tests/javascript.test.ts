@@ -4,6 +4,7 @@ import { cloneSourceMaps } from "../src/core/processor";
 import type { FetchFunction, Logger } from "../src/core/types";
 import { getSourceMappingURL } from "../src/core/source-map-utils";
 import { extractJsUrlsFromText, getFallbackSourceMapUrl } from "../src/parsers/javascript";
+import { processSourceMap } from "../src/parsers/source-map";
 
 const logger: Logger = {
   info: () => undefined,
@@ -75,6 +76,86 @@ test("cloneSourceMaps uses fallback source maps for query-string JavaScript file
   assert.equal(result.files.size, 1);
   assert.deepEqual([...result.files.values()], ["export const value = 1;"]);
   assert.ok(requestedUrls.includes("https://example.com/assets/app.js.map?v=123"));
+});
+
+test("processSourceMap reconciles sourceRoot paths and preserves empty sources", async () => {
+  const files = await processSourceMap(
+    {
+      version: 3,
+      sourceRoot: "webpack://app/",
+      sources: ["./src/app.ts", "webpack://_N_E/./pages/index.tsx", "webpack:///./src/empty.ts", "[synthetic:base64]"],
+      sourcesContent: ["export const app = true;", "export default function Page() {}", "", "ignored"],
+      mappings: "",
+    },
+    "https://example.com/_next/static/chunks/app.js",
+    {
+      fetch: async () => {
+        throw new Error("fetch should not be called");
+      },
+      logger,
+      headers: {},
+    },
+  );
+
+  assert.deepEqual(files, [
+    { path: "src/app.ts", content: "export const app = true;" },
+    { path: "pages/index.tsx", content: "export default function Page() {}" },
+    { path: "src/empty.ts", content: "" },
+  ]);
+});
+
+test("cloneSourceMaps reconciles duplicate source paths by keeping best content", async () => {
+  const responses = new Map<string, string>([
+    ["https://example.com/page", '<script src="/assets/app.js"></script>'],
+    ["https://example.com/assets/app.js", "console.log('minified');"],
+    [
+      "https://example.com/assets/app.js.map",
+      JSON.stringify({
+        version: 3,
+        sources: [
+          "webpack://app/./src/file.ts",
+          "webpack:///./src/file.ts",
+          "webpack://app/./src/conflict.ts",
+          "webpack:///./src/conflict.ts",
+          "webpack://app/./src/same.ts",
+          "webpack:///./src/same.ts",
+          "webpack:///./src/exact.ts",
+          "webpack:///./src/exact.ts",
+        ],
+        sourcesContent: ["", "export const value = 1;", "one", "two", "same", "same", "first", "second"],
+        mappings: "",
+      }),
+    ],
+  ]);
+
+  const fetch: FetchFunction = async (url) => {
+    const body = responses.get(url);
+
+    if (body === undefined) {
+      throw new Error(`Unexpected URL: ${url}`);
+    }
+
+    return {
+      body,
+      statusCode: 200,
+      requestUrl: url,
+    };
+  };
+
+  const result = await cloneSourceMaps({
+    urls: "https://example.com/page",
+    fetch,
+    logger,
+    headers: {},
+  });
+
+  assert.equal(result.files.get("src/file.ts"), "export const value = 1;");
+  assert.equal(result.files.get("src/conflict.ts"), "one");
+  assert.equal(result.files.get("src/same.ts"), "same");
+  assert.equal(result.files.get("src/exact.ts"), "first");
+  assert.equal(result.errors.length, 2);
+  assert.equal(result.errors[0]?.file, "src/conflict.ts");
+  assert.equal(result.errors[1]?.file, "src/exact.ts");
 });
 
 test("cloneSourceMaps merges custom headers with default browser headers", async () => {

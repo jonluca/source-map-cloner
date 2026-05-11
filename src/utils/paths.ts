@@ -14,6 +14,67 @@ export function joinPath(...segments: string[]): string {
     .replace(/\/$/g, "");
 }
 
+const bundlerProtocols = new Set(["webpack:", "ng:", "parcel:", "rollup:", "vite:"]);
+
+function safeDecodeURI(value: string): string {
+  try {
+    return decodeURI(value);
+  } catch {
+    return value;
+  }
+}
+
+function stripSourceProtocol(source: string): string {
+  const trimmed = source.trim().replace(/\\/g, "/");
+
+  try {
+    const url = new URL(trimmed);
+
+    if (bundlerProtocols.has(url.protocol)) {
+      return safeDecodeURI(url.pathname);
+    }
+
+    if (url.protocol === "file:") {
+      return safeDecodeURI(url.pathname);
+    }
+
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return safeDecodeURI(joinPath(url.hostname, url.pathname));
+    }
+  } catch {
+    // Source map entries are often not valid URLs. Fall back to string cleanup.
+  }
+
+  return trimmed.replace(/^(webpack|ng|parcel|rollup|vite):\/\/(?:[^/]+)?/i, "").replace(/^file:\/\//i, "");
+}
+
+function normalizeRelativePath(path: string): string {
+  const withoutQuery = path.split(/[?#]/, 1)[0] ?? "";
+  const segments: string[] = [];
+
+  for (const segment of withoutQuery.replace(/\\/g, "/").split("/")) {
+    if (!segment || segment === ".") {
+      continue;
+    }
+
+    if (segment === "..") {
+      segments.pop();
+      continue;
+    }
+
+    segments.push(segment);
+  }
+
+  return segments.join("/");
+}
+
+/**
+ * Normalize source map source paths into stable local paths.
+ */
+export function normalizeSourcePath(source: string): string {
+  return normalizeRelativePath(stripSourceProtocol(source));
+}
+
 /**
  * Parse a path to get directory and filename
  */
@@ -44,26 +105,10 @@ export function dirname(path: string): string {
  * Sanitize a path to prevent directory traversal
  */
 export function sanitizePath(basePath: string, relativePath: string): string {
-  // Remove leading protocol and domain
-  let sanitized = relativePath.replace(/^webpack:\/\/_N_E\//, "").replace(/^(.*?):\/\//, "");
+  const base = normalizeRelativePath(basePath);
+  const relative = normalizeRelativePath(stripSourceProtocol(relativePath));
 
-  // Remove leading slashes
-  sanitized = sanitized.replace(/^\/+/, "");
-
-  // Remove .. references that would escape the base path
-  while (sanitized.includes("../")) {
-    sanitized = sanitized.replace(/^\.\.\//, "").replace(/\/\.\.\//g, "/");
-  }
-
-  // Join with base path
-  const joined = joinPath(basePath, sanitized);
-
-  // Ensure the result doesn't escape the base path
-  if (!joined.startsWith(basePath)) {
-    return joinPath(basePath, sanitized.replace(/\.\./g, ""));
-  }
-
-  return joined;
+  return joinPath(base, relative);
 }
 
 /**
@@ -78,14 +123,11 @@ export function getOutputPath(
 ): string {
   const { outputPrefix = "" } = options;
 
-  const value = source.replace(/^webpack:\/\/_N_E\//, "").replace(/^(.*?):\/\//, "");
+  const value = normalizeSourcePath(source);
 
   if (!value) {
     throw new Error(`Empty source path: ${source}`);
   }
 
-  const outputPath: string = joinPath(outputPrefix, value);
-
-  // Sanitize the path
-  return sanitizePath(outputPrefix, outputPath.replace(outputPrefix, ""));
+  return sanitizePath(outputPrefix, value);
 }

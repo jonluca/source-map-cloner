@@ -1,7 +1,6 @@
-import type { RawSourceMap } from "source-map";
-import sourceMap from "source-map";
+import sourceMap, { type BasicSourceMapConsumer, type IndexedSourceMapConsumer } from "source-map";
 import { SourceMapParseError } from "../utils/errors";
-import { getOutputPath } from "../utils/paths";
+import { getOutputPath, normalizeSourcePath } from "../utils/paths";
 import type { SourceMapClonerOptions, SourceFile } from "../core/types";
 
 const { SourceMapConsumer } = sourceMap;
@@ -11,22 +10,56 @@ export interface ParsedSourceMap {
   sourcesContent: (string | null)[];
 }
 
+interface RawSourceMapWithContent {
+  sourcesContent?: unknown[];
+}
+
+function getRawSourceContent(rawSourcesContent: unknown[] | undefined, index: number): string | null | undefined {
+  const content = rawSourcesContent?.[index];
+
+  if (typeof content === "string" || content === null) {
+    return content;
+  }
+
+  return undefined;
+}
+
 /**
  * Parse a source map from string or object
  */
 export async function parseSourceMap(sourceMapData: string | object, sourceUrl: string): Promise<ParsedSourceMap> {
+  let consumer: BasicSourceMapConsumer | IndexedSourceMapConsumer | undefined;
+
   try {
-    const parsed = (await new SourceMapConsumer(
-      typeof sourceMapData === "string" ? JSON.parse(sourceMapData) : sourceMapData,
-    )) as unknown as RawSourceMap;
+    const rawSourceMap = typeof sourceMapData === "string" ? JSON.parse(sourceMapData) : sourceMapData;
+    const rawSourcesContent = Array.isArray((rawSourceMap as RawSourceMapWithContent).sourcesContent)
+      ? (rawSourceMap as RawSourceMapWithContent).sourcesContent
+      : undefined;
+
+    consumer = await new SourceMapConsumer(rawSourceMap);
+    const sources = consumer.sources || [];
 
     return {
-      sources: parsed.sources || [],
-      sourcesContent: parsed.sourcesContent || [],
+      sources,
+      sourcesContent: sources.map((source, index) => {
+        const rawContent = getRawSourceContent(rawSourcesContent, index);
+        if (rawContent !== undefined) {
+          return rawContent;
+        }
+
+        const content = consumer?.sourceContentFor(source, true);
+        return typeof content === "string" ? content : null;
+      }),
     };
   } catch (error) {
     throw new SourceMapParseError(sourceUrl, error);
+  } finally {
+    consumer?.destroy();
   }
+}
+
+function isSyntheticSource(source: string): boolean {
+  return source.startsWith("[synthetic:") || normalizeSourcePath(source).startsWith("[synthetic:");
 }
 
 /**
@@ -49,11 +82,11 @@ export function extractSourceFiles(
     const sourceContent = parsedMap.sourcesContent[i];
 
     // Skip synthetic sources
-    if (source.startsWith("[synthetic:")) {
+    if (isSyntheticSource(source)) {
       continue;
     }
 
-    if (!sourceContent) {
+    if (sourceContent === null || sourceContent === undefined) {
       if (options.verbose) {
         options.logger.warn(`No source content for ${source}`);
       }
