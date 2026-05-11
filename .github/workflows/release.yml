@@ -6,17 +6,25 @@ on:
       - main
 permissions:
   contents: write
+  issues: write
+  pull-requests: write
   id-token: write
 jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
         with:
-          node-version: latest
-      - run: npm install -g pnpm@11.0.9
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.0.9
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm dlx semantic-release --branches main
