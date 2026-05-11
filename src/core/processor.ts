@@ -140,7 +140,26 @@ const defaultHeaders = {
   "sec-fetch-user": "?1",
   "upgrade-insecure-requests": "1",
   "user-agent": userAgent!,
-} as CloneOptions["headers"];
+} satisfies Record<string, string>;
+
+function mergeHeaders(
+  defaults: Record<string, string>,
+  overrides: Record<string, string> | undefined,
+): Record<string, string> {
+  const merged = { ...defaults };
+
+  for (const [key, value] of Object.entries(overrides ?? {})) {
+    const existingKey = Object.keys(merged).find((header) => header.toLowerCase() === key.toLowerCase());
+
+    if (existingKey && existingKey !== key) {
+      delete merged[existingKey];
+    }
+
+    merged[key] = value;
+  }
+
+  return merged;
+}
 
 /**
  * Clone source maps from one or more URLs and return results in memory
@@ -176,7 +195,7 @@ export async function cloneSourceMaps(options: CloneOptions): Promise<CloneResul
     fetch: options.fetch,
     logger: options.logger || noopLogger,
     verbose: options.verbose || false,
-    headers: options.headers || defaultHeaders,
+    headers: mergeHeaders(defaultHeaders, options.headers),
     baseUrl,
     seenSources: new Set<string>(),
   };
@@ -282,7 +301,6 @@ async function crawlAndProcess(urls: string[], options: SourceMapClonerOptions, 
         }
         resolve();
       } catch (error) {
-        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
         reject(error);
       }
     });

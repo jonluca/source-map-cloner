@@ -16,9 +16,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: latest
-      - run: yarn install --immutable
-      - run: yarn build
-      - run: npx semantic-release --branches main
+      - run: npm install -g pnpm@11.0.9
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm dlx semantic-release --branches main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

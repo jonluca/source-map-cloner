@@ -26,11 +26,14 @@
   },
   "scripts": {
     "build": "tsc",
-    "format:check": "prettier --check . --cache",
-    "format:write": "prettier --write . --cache",
-    "typecheck": "tsc --noEmit && yarn workspace webapp typecheck",
+    "format:check": "oxfmt --check .",
+    "format:write": "oxfmt --write .",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint . --fix",
+    "test": "tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit && pnpm --filter webapp typecheck",
     "fetch-source": "tsx src/cli/index.ts",
-    "dev-webapp": "yarn workspace webapp dev"
+    "dev-webapp": "pnpm --filter webapp dev"
   },
   "files": [
     "tsconfig.json",
@@ -40,51 +43,29 @@
   ],
   "dependencies": {
     "crawler": "^2.0.2",
-    "got": "^14.6.6",
+    "got": "^15.0.5",
     "iconv-lite": "^0.7.2",
-    "jsdom": "^27.4.0",
+    "jsdom": "^29.1.1",
     "mkdirp": "^3.0.1",
     "p-map": "^7.0.4",
     "source-map": "^0.7.6",
-    "top-user-agents": "^2.1.91",
-    "vm2": "^3.10.2",
+    "top-user-agents": "^2.1.111",
+    "vm2": "^3.11.3",
     "yargs": "^18.0.0"
   },
   "devDependencies": {
-    "@eslint/compat": "^2.0.1",
-    "@eslint/eslintrc": "^3.3.3",
-    "@eslint/js": "^9.39.2",
     "@types/crawler": "^1.2.7",
-    "@types/eslint": "9.6.1",
-    "@types/jsdom": "^27.0.0",
-    "@types/node": "25.0.10",
+    "@types/jsdom": "^28.0.1",
+    "@types/node": "25.6.2",
     "@types/yargs": "^17.0.35",
-    "@typescript-eslint/eslint-plugin": "^8.53.1",
-    "@typescript-eslint/eslint-plugin-tslint": "^7.0.2",
-    "@typescript-eslint/parser": "^8.53.1",
-    "eslint": "^9.39.2",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-config-standard": "^17.1.0",
-    "eslint-plugin-import": "^2.32.0",
-    "eslint-plugin-node": "^11.1.0",
-    "eslint-plugin-prettier": "^5.5.5",
-    "eslint-plugin-promise": "^7.2.1",
-    "eslint-plugin-unused-imports": "^4.3.0",
-    "lint-staged": "^16.2.7",
-    "prettier": "^3.8.1",
-    "pretty-quick": "^4.2.2",
+    "lint-staged": "^17.0.4",
+    "oxfmt": "^0.48.0",
+    "oxlint": "^1.63.0",
     "tsx": "^4.21.0",
-    "typescript": "5.9.3",
-    "typescript-eslint": "^8.53.1"
+    "typescript": "6.0.3"
   },
-  "packageManager": "yarn@4.9.2",
+  "packageManager": "pnpm@11.0.9",
   "workspaces": [
     "webapp"
-  ],
-  "prettier": {
-    "printWidth": 120,
-    "plugins": [
-      "prettier-plugin-tailwindcss"
-    ]
-  }
+  ]
 }

@@ -27,9 +27,17 @@ function getSourceMappingURL(code: string) {
   const sourceMappingURL = match ? match[1] || match[2] || "" : null;
 
   return {
-    sourceMappingURL: sourceMappingURL ? decodeURI(sourceMappingURL) : sourceMappingURL,
+    sourceMappingURL: sourceMappingURL ? safeDecodeURI(sourceMappingURL) : sourceMappingURL,
     replacementString: match ? match[0] : null,
   };
+}
+
+function safeDecodeURI(value: string): string {
+  try {
+    return decodeURI(value);
+  } catch {
+    return value;
+  }
 }
 
 export { getSourceMappingURL };

@@ -5,7 +5,16 @@ import type { SourceMapClonerOptions } from "../core/types";
 const { JSDOM } = jsdom;
 
 // Regex patterns for finding JavaScript files
-const JS_FILE_REGEX = /(?<=")([^"]+\.js)(?=")/gi;
+const JS_FILE_REGEX = /["']([^"'<>]+?\.js(?:[?#][^"'<>]*)?)["']/gi;
+
+function isJavaScriptUrl(url: string): boolean {
+  try {
+    return new URL(url).pathname.endsWith(".js");
+  } catch {
+    const [pathname] = url.split(/[?#]/);
+    return pathname?.endsWith(".js") ?? false;
+  }
+}
 
 /**
  * Extract JavaScript URLs from HTML content
@@ -26,10 +35,9 @@ export function extractJsUrlsFromHtml(
 
     const dom = new JSDOM(html, {
       runScripts: "dangerously",
-      resources: "usable",
+      resources: { userAgent: "Mozilla/5.0" },
       url: baseUrl,
       pretendToBeVisual: true,
-      userAgent: "Mozilla/5.0",
       virtualConsole,
     });
 
@@ -85,16 +93,20 @@ export function extractJsUrlsFromHtml(
  */
 export function extractJsUrlsFromText(content: string, baseUrl: string): string[] {
   const urls: string[] = [];
-  const matches = content.match(JS_FILE_REGEX);
+  const matches = content.matchAll(JS_FILE_REGEX);
 
-  if (matches) {
-    for (const match of matches) {
-      try {
-        const url = new URL(match, baseUrl);
-        urls.push(url.href);
-      } catch {
-        // Invalid URL, skip
-      }
+  for (const match of matches) {
+    const jsUrl = match[1];
+
+    if (!jsUrl) {
+      continue;
+    }
+
+    try {
+      const url = new URL(jsUrl, baseUrl);
+      urls.push(url.href);
+    } catch {
+      // Invalid URL, skip
     }
   }
 
@@ -174,7 +186,7 @@ export async function discoverJavaScriptFiles(url: string, options: SourceMapClo
   const jsFiles: string[] = [];
 
   // If the URL is already a JS file, return it
-  if (url.endsWith(".js")) {
+  if (isJavaScriptUrl(url)) {
     return [url];
   }
 
@@ -228,12 +240,13 @@ export async function discoverJavaScriptFiles(url: string, options: SourceMapClo
  * Generate a fallback source map URL for a JS file
  */
 export function getFallbackSourceMapUrl(jsUrl: string): string | null {
-  if (!jsUrl.endsWith(".js")) {
-    return null;
-  }
-
   try {
     const url = new URL(jsUrl);
+
+    if (!url.pathname.endsWith(".js")) {
+      return null;
+    }
+
     url.pathname = url.pathname + ".map";
     return url.href;
   } catch {

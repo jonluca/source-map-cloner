@@ -27,8 +27,6 @@
     "noImplicitAny": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "baseUrl": ".",
-    "downlevelIteration": true,
     "declaration": true,
     "checkJs": true
   },

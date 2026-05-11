@@ -1,0 +1,6 @@
+{
+  "printWidth": 120,
+  "sortTailwindcss": {},
+  "sortPackageJson": false,
+  "ignorePatterns": [".next/**", "dist/**", "runs/**", "webapp/.next/**", "webapp/node_modules/**", "node_modules/**"]
+}

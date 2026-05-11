@@ -1,0 +1,54 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["import", "node", "promise", "react", "jsx-a11y", "nextjs", "typescript", "unicorn", "oxc"],
+  "ignorePatterns": [
+    ".next/**",
+    "dist/**",
+    "runs/**",
+    "webapp/.next/**",
+    "webapp/node_modules/**",
+    "node_modules/**",
+    "public/*.js",
+    "public/*.map"
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "rules": {
+    "curly": "error",
+    "jsx_a11y/click-events-have-key-events": "warn",
+    "jsx_a11y/no-static-element-interactions": "warn",
+    "no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_",
+        "ignoreRestSiblings": true,
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "object-shorthand": "error",
+    "prefer-const": "error",
+    "react/react-in-jsx-scope": "off",
+    "typescript/consistent-type-definitions": ["error", "interface"],
+    "typescript/consistent-type-imports": [
+      "error",
+      {
+        "prefer": "type-imports"
+      }
+    ]
+  },
+  "env": {
+    "browser": true,
+    "builtin": true,
+    "node": true
+  },
+  "settings": {
+    "next": {
+      "rootDir": "webapp/"
+    },
+    "react": {
+      "version": "19.1.1"
+    }
+  }
+}
