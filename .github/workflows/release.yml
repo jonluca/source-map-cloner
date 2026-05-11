@@ -23,11 +23,12 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: pnpm
+          package-manager-cache: false
           registry-url: https://registry.npmjs.org
+      - run: npm install -g npm@^11.10.0
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm dlx semantic-release --branches main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true

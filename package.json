@@ -3,6 +3,10 @@
   "version": "0.0.0-development",
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jonluca/source-map-cloner.git"
+  },
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "bin": "dist/src/cli/index.js",
@@ -41,6 +45,10 @@
     "dist",
     "README.md"
   ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "provenance": true
+  },
   "dependencies": {
     "crawler": "^2.0.2",
     "got": "^15.0.5",
