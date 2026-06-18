@@ -2,17 +2,22 @@ import { gotClient, agent } from "./http-client.js";
 import { HTTPError } from "../utils/errors.js";
 import type { FetchFunction } from "../core/types.js";
 
+export interface NodeFetchOptions {
+  /** Headers included with every request. Per-request headers take precedence. */
+  headers?: Record<string, string>;
+}
+
 /**
  * Create a fetch function using Got for Node.js environments
  */
-export function createNodeFetch(): FetchFunction {
+export function createNodeFetch(defaultOptions: NodeFetchOptions = {}): FetchFunction {
   return async function nodeFetch(
     url: string,
     options?: { headers?: Record<string, string> },
   ): Promise<{ body: string; statusCode: number; requestUrl: string }> {
     try {
       const response = await gotClient(url, {
-        headers: options?.headers ?? {},
+        headers: { ...defaultOptions.headers, ...options?.headers },
         agent,
         responseType: "text",
       });

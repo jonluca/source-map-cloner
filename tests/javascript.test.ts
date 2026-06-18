@@ -117,12 +117,13 @@ test("cloneSourceMaps reconciles duplicate source paths by keeping best content"
           "webpack:///./src/file.ts",
           "webpack://app/./src/conflict.ts",
           "webpack:///./src/conflict.ts",
+          "webpack://third/./src/conflict.ts",
           "webpack://app/./src/same.ts",
           "webpack:///./src/same.ts",
           "webpack:///./src/exact.ts",
           "webpack:///./src/exact.ts",
         ],
-        sourcesContent: ["", "export const value = 1;", "one", "two", "same", "same", "first", "second"],
+        sourcesContent: ["", "export const value = 1;", "one", "two", "two", "same", "same", "first", "second"],
         mappings: "",
       }),
     ],
@@ -151,11 +152,15 @@ test("cloneSourceMaps reconciles duplicate source paths by keeping best content"
 
   assert.equal(result.files.get("src/file.ts"), "export const value = 1;");
   assert.equal(result.files.get("src/conflict.ts"), "one");
+  assert.equal(result.files.get("src/conflict.conflict-2.ts"), "two");
+  assert.equal(result.files.has("src/conflict.conflict-3.ts"), false);
   assert.equal(result.files.get("src/same.ts"), "same");
   assert.equal(result.files.get("src/exact.ts"), "first");
-  assert.equal(result.errors.length, 2);
-  assert.equal(result.errors[0]?.file, "src/conflict.ts");
-  assert.equal(result.errors[1]?.file, "src/exact.ts");
+  assert.equal(result.files.get("src/exact.conflict-2.ts"), "second");
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.warnings.length, 2);
+  assert.equal(result.warnings[0]?.file, "src/conflict.conflict-2.ts");
+  assert.equal(result.warnings[1]?.file, "src/exact.conflict-2.ts");
 });
 
 test("cloneSourceMaps merges custom headers with default browser headers", async () => {

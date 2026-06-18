@@ -4,8 +4,9 @@ A powerful TypeScript library and CLI tool for extracting and cloning source fil
 
 ## Features
 
-- 🔍 **Source Map Extraction**: Automatically discovers and extracts source maps from JavaScript files
+- 🔍 **Source Map Extraction**: Automatically discovers and extracts source maps from JavaScript, MJS, and CJS files
 - 🌐 **Multiple URL Support**: Process single URLs or crawl entire sites
+- 🧩 **Framework-Aware Discovery**: Follows Next.js App Router Flight chunks and recursively discovers modern bundler imports
 - 📁 **Structure Preservation**: Maintains original directory structure when extracting files
 - 🚀 **TypeScript First**: Written in TypeScript with full type definitions
 - 🔌 **Flexible Fetchers**: Built-in Node.js and browser-compatible HTTP fetchers
@@ -28,19 +29,26 @@ pnpm add source-map-cloner
 
 ```bash
 # Basic usage - extract source maps from a URL
-npx source-map-cloner https://example.com output-directory
+npx source-map-cloner -u https://example.com -d output-directory
 
 # Multiple URLs
-npx source-map-cloner -u https://example.com -u https://another.com output-dir
+npx source-map-cloner -u https://example.com -u https://another.com -d output-dir
 
 # Enable crawling to discover linked pages
-npx source-map-cloner --crawl https://example.com output-dir
+npx source-map-cloner --crawl -u https://example.com -d output-dir
 
 # Custom headers for authentication
-npx source-map-cloner --header "Authorization: Bearer token" https://example.com output-dir
+npx source-map-cloner -u https://example.com -H "Authorization: Bearer token" -d output-dir
 
 # Custom user agent
-npx source-map-cloner --user-agent "MyBot 1.0" https://example.com output-dir
+npx source-map-cloner -u https://example.com -H "User-Agent: MyBot 1.0" -d output-dir
+
+# Limit concurrent JavaScript requests and skip recovery of omitted sourcesContent
+npx source-map-cloner -u https://example.com --concurrency 8 --no-fetch-missing-sources
+
+# Limit recursive chunk discovery, or disable it entirely
+npx source-map-cloner -u https://example.com --max-script-depth 2
+npx source-map-cloner -u https://example.com --no-discover-referenced-scripts
 ```
 
 ### Programmatic API
@@ -183,6 +191,10 @@ Main function to clone source maps from URLs.
 - `cleanupKnownInvalidFiles?`: Remove known invalid files
 - `headers?`: Additional HTTP headers
 - `verbose?`: Enable verbose logging
+- `concurrency?`: Maximum concurrent JavaScript requests (defaults to `20`)
+- `fetchMissingSources?`: Fetch referenced source files when `sourcesContent` is absent (defaults to `true`)
+- `discoverReferencedScripts?`: Follow JavaScript referenced by fetched bundles (defaults to `true`)
+- `maxScriptDepth?`: Maximum recursive chunk-discovery depth (defaults to `3`)
 
 **Returns:** `CloneResult` with extracted files, statistics, and errors
 
@@ -226,6 +238,11 @@ interface CloneResult {
     file?: string;
     error: string;
   }>;
+  warnings: Array<{
+    url?: string;
+    file?: string;
+    warning: string;
+  }>;
 }
 
 interface Logger {
@@ -260,6 +277,12 @@ The tool handles various source map formats:
 - External source map files (`//# sourceMappingURL=...`)
 - Inline data URLs
 - Next.js build manifests (`_buildManifest.js`)
+- Next.js App Router chunks embedded in `self.__next_f` Flight payloads, including CDN asset prefixes
+- Static and dynamic JavaScript imports emitted by Vite, Rollup, SvelteKit, Nuxt, Astro, Remix/React Router, and similar bundlers
+- Maps without `sourcesContent` when their source URLs remain fetchable
+- Indexed source maps and maps prefixed with a BOM or common JSON-hijacking guards
+
+When multiple maps contain different content for the same normalized path, the first file keeps the original name and later files are preserved with names such as `app.conflict-2.ts`. These are returned as non-fatal warnings.
 
 ## Development
 
@@ -278,7 +301,7 @@ npm run typecheck
 ### Running in Development
 
 ```bash
-npm run fetch-source -- https://example.com output-dir
+npm run fetch-source -- -u https://example.com -d output-dir
 ```
 
 ## License

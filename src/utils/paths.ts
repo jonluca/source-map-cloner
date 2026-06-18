@@ -62,10 +62,29 @@ function normalizeRelativePath(path: string): string {
       continue;
     }
 
-    segments.push(segment);
+    const sanitized = sanitizePathSegment(segment);
+    if (sanitized) {
+      segments.push(sanitized);
+    }
   }
 
   return segments.join("/");
+}
+
+function sanitizePathSegment(segment: string): string {
+  const invalidCharacters = '<>:"|?*';
+  let sanitized = Array.from(segment, (character) =>
+    character.charCodeAt(0) <= 0x1f || invalidCharacters.includes(character) ? "_" : character,
+  )
+    .join("")
+    .replace(/[. ]+$/g, "")
+    .trim();
+
+  if (/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i.test(sanitized)) {
+    sanitized = `_${sanitized}`;
+  }
+
+  return sanitized;
 }
 
 /**

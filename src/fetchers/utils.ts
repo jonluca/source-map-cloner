@@ -12,7 +12,7 @@ export async function fetchFromURL(
   baseUrl: string,
   headers: Record<string, string>,
   fetch: FetchFunction,
-): Promise<{ sourceContent: string }> {
+): Promise<{ sourceContent: string; sourceUrl: string }> {
   // Handle data URLs
   if (sourceMapUrl.startsWith("data:")) {
     const dataURL = parseDataURL(sourceMapUrl);
@@ -20,7 +20,7 @@ export async function fetchFromURL(
       // JSON text SHALL be encoded in Unicode. The default encoding is UTF-8.
       const encodingName = labelToName(dataURL.parameters.get("charset")) || "UTF-8";
       const sourceContent = decode(dataURL.body, encodingName);
-      return { sourceContent };
+      return { sourceContent, sourceUrl: baseUrl };
     }
     throw new Error(`Failed to parse source map from "data" URL: ${sourceMapUrl}`);
   }
@@ -28,7 +28,7 @@ export async function fetchFromURL(
   // Handle regular URLs
   const absoluteUrl = new URL(sourceMapUrl, baseUrl).href;
   const response = await fetch(absoluteUrl, { headers });
-  return { sourceContent: response.body };
+  return { sourceContent: response.body, sourceUrl: response.requestUrl || absoluteUrl };
 }
 
 function labelToName(label: any): string | null {

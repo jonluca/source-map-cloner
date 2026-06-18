@@ -1,4 +1,10 @@
-import sourceMap, { type BasicSourceMapConsumer, type IndexedSourceMapConsumer } from "source-map";
+import sourceMap, {
+  type BasicSourceMapConsumer,
+  type IndexedSourceMapConsumer,
+  type RawIndexMap,
+  type RawSourceMap,
+} from "source-map";
+import pMap from "p-map";
 import { SourceMapParseError } from "../utils/errors.js";
 import { getOutputPath, normalizeSourcePath } from "../utils/paths.js";
 import type { SourceMapClonerOptions, SourceFile } from "../core/types.js";
@@ -24,6 +30,15 @@ function getRawSourceContent(rawSourcesContent: unknown[] | undefined, index: nu
   return undefined;
 }
 
+function parseSourceMapJson(value: string): object {
+  const normalized = value
+    .replace(/^\uFEFF/, "")
+    .trimStart()
+    .replace(/^(?:\)\]\}',?|while\s*\(1\)\s*;|for\s*\(;;\)\s*;)\s*/, "");
+
+  return JSON.parse(normalized) as object;
+}
+
 /**
  * Parse a source map from string or object
  */
@@ -31,12 +46,12 @@ export async function parseSourceMap(sourceMapData: string | object, sourceUrl: 
   let consumer: BasicSourceMapConsumer | IndexedSourceMapConsumer | undefined;
 
   try {
-    const rawSourceMap = typeof sourceMapData === "string" ? JSON.parse(sourceMapData) : sourceMapData;
+    const rawSourceMap = typeof sourceMapData === "string" ? parseSourceMapJson(sourceMapData) : sourceMapData;
     const rawSourcesContent = Array.isArray((rawSourceMap as RawSourceMapWithContent).sourcesContent)
       ? (rawSourceMap as RawSourceMapWithContent).sourcesContent
       : undefined;
 
-    consumer = await new SourceMapConsumer(rawSourceMap);
+    consumer = await new SourceMapConsumer(rawSourceMap as RawSourceMap | RawIndexMap);
     const sources = consumer.sources || [];
 
     return {
@@ -58,8 +73,62 @@ export async function parseSourceMap(sourceMapData: string | object, sourceUrl: 
   }
 }
 
+function getFetchableSourceUrl(source: string, sourceMapUrl: string): string | null {
+  try {
+    const url = new URL(source, sourceMapUrl);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchMissingSourceContent(
+  parsedMap: ParsedSourceMap,
+  sourceMapUrl: string,
+  options: SourceMapClonerOptions,
+): Promise<ParsedSourceMap> {
+  if (options.fetchMissingSources === false || !parsedMap.sourcesContent.some((content) => content === null)) {
+    return parsedMap;
+  }
+
+  const sourcesContent = [...parsedMap.sourcesContent];
+  const missingIndexes = sourcesContent.flatMap((content, index) => (content === null ? [index] : []));
+
+  await pMap(
+    missingIndexes,
+    async (index) => {
+      const source = parsedMap.sources[index];
+      if (!source || isSyntheticSource(source)) {
+        return;
+      }
+
+      const sourceUrl = getFetchableSourceUrl(source, sourceMapUrl);
+      if (!sourceUrl) {
+        return;
+      }
+
+      try {
+        const response = await options.fetch(sourceUrl, { headers: options.headers ?? {} });
+        sourcesContent[index] = response.body;
+
+        if (options.verbose) {
+          options.logger.info(`Fetched missing source content: ${sourceUrl}`);
+        }
+      } catch (error) {
+        if (options.verbose) {
+          options.logger.warn(`Failed to fetch missing source ${sourceUrl}: ${error}`);
+        }
+      }
+    },
+    { concurrency: Math.max(1, Math.min(options.concurrency ?? 8, 8)) },
+  );
+
+  return { ...parsedMap, sourcesContent };
+}
+
 function isSyntheticSource(source: string): boolean {
-  return source.startsWith("[synthetic:") || normalizeSourcePath(source).startsWith("[synthetic:");
+  const normalized = normalizeSourcePath(source);
+  return source.includes("[synthetic:") || normalized.startsWith("[synthetic:") || normalized.startsWith("[synthetic_");
 }
 
 /**
@@ -127,7 +196,11 @@ export async function processSourceMap(
   options: SourceMapClonerOptions,
 ): Promise<SourceFile[]> {
   try {
-    const parsedMap = await parseSourceMap(sourceMapData, sourceUrl);
+    const parsedMap = await fetchMissingSourceContent(
+      await parseSourceMap(sourceMapData, sourceUrl),
+      sourceUrl,
+      options,
+    );
     const files = extractSourceFiles(parsedMap, sourceUrl, options);
 
     if (options.verbose) {

@@ -1,6 +1,10 @@
 import pMap from "p-map";
 import { processSourceMap } from "../parsers/source-map.js";
-import { discoverJavaScriptFiles, getFallbackSourceMapUrl } from "../parsers/javascript.js";
+import {
+  discoverJavaScriptFiles,
+  extractReferencedJavaScriptUrls,
+  getFallbackSourceMapUrl,
+} from "../parsers/javascript.js";
 import { getSourceMappingURL } from "./source-map-utils.js";
 import { fetchFromURL } from "../fetchers/utils.js";
 import { InvalidURLError } from "../utils/errors.js";
@@ -8,59 +12,74 @@ import { noopLogger } from "../utils/default-logger.js";
 import type { CloneOptions, CloneResult, SourceMapClonerOptions, SourceFile } from "./types.js";
 import { createBrowserFetch } from "../fetchers/browser.js";
 import userAgents from "top-user-agents";
+import { getUtf8ByteLength } from "../utils/bytes.js";
 
 /**
  * Fetch and parse a JavaScript file for source maps
  */
-async function fetchAndParseJsFile(url: string, options: SourceMapClonerOptions): Promise<SourceFile[]> {
+interface ProcessedJavaScriptFile {
+  files: SourceFile[];
+  referencedScripts: string[];
+}
+
+async function fetchAndParseJsFile(url: string, options: SourceMapClonerOptions): Promise<ProcessedJavaScriptFile> {
   const { verbose, headers, fetch } = options;
+  const { body: data, requestUrl } = await fetch(url, { headers });
+  const bundleUrl = new URL(requestUrl, url).href;
+  const { sourceMappingURL } = getSourceMappingURL(data);
+  const referencedScripts = options.discoverReferencedScripts ? extractReferencedJavaScriptUrls(data, bundleUrl) : [];
 
-  try {
-    const { body: data } = await fetch(url, { headers });
-    const { sourceMappingURL } = getSourceMappingURL(data);
+  if (verbose && sourceMappingURL) {
+    options.logger.info(`Found source map url: ${sourceMappingURL}`);
+  }
 
-    if (verbose && sourceMappingURL) {
-      options.logger.info(`Found source map url: ${sourceMappingURL}`);
-    }
+  // Try both the source map URL and fallback .map URL.
+  const urlsToCheck = [sourceMappingURL, getFallbackSourceMapUrl(bundleUrl)].filter(Boolean) as string[];
+  const checkedSourceMapUrls = new Set<string>();
 
-    // Try both the source map URL and fallback .map URL
-    const urlsToCheck = [sourceMappingURL, getFallbackSourceMapUrl(url)].filter(Boolean) as string[];
-
-    for (const sourceMapUrl of urlsToCheck) {
+  for (const sourceMapUrl of urlsToCheck) {
+    let canonicalUrl = sourceMapUrl;
+    if (!sourceMapUrl.startsWith("data:")) {
       try {
-        const { sourceContent } = await fetchFromURL(sourceMapUrl, url, headers || {}, fetch);
-
-        if (sourceContent && !sourceContent.startsWith("<")) {
-          if (verbose) {
-            options.logger.info(`Found source map content: ${sourceMapUrl}`);
-          }
-          const files = await processSourceMap(sourceContent, url, options);
-          if (files.length > 0) {
-            return files;
-          }
-        } else if (verbose) {
-          options.logger.info(`No source map content for: ${sourceMapUrl}`);
-        }
-      } catch (error) {
-        if (verbose) {
-          options.logger.warn(`Failed to fetch source map from ${sourceMapUrl}: ${error}`);
-        }
+        canonicalUrl = new URL(sourceMapUrl, bundleUrl).href;
+      } catch {
+        // Keep the raw value for deduplication; fetchFromURL will report the
+        // malformed candidate and the fallback map can still be attempted.
       }
     }
-  } catch (error) {
-    options.logger.error(`Error fetching JS file ${url}: ${error}`);
-    if (verbose) {
-      console.error(error);
+    if (checkedSourceMapUrls.has(canonicalUrl)) {
+      continue;
+    }
+    checkedSourceMapUrls.add(canonicalUrl);
+
+    try {
+      const { sourceContent, sourceUrl } = await fetchFromURL(sourceMapUrl, bundleUrl, headers || {}, fetch);
+
+      if (sourceContent && !sourceContent.trimStart().startsWith("<")) {
+        if (verbose) {
+          options.logger.info(`Found source map content: ${sourceMapUrl}`);
+        }
+        const files = await processSourceMap(sourceContent, sourceUrl, options);
+        if (files.length > 0) {
+          return { files, referencedScripts };
+        }
+      } else if (verbose) {
+        options.logger.info(`No source map content for: ${sourceMapUrl}`);
+      }
+    } catch (error) {
+      if (verbose) {
+        options.logger.warn(`Failed to fetch source map from ${sourceMapUrl}: ${error}`);
+      }
     }
   }
 
-  return [];
+  return { files: [], referencedScripts };
 }
 
 function addSourceFileToResult(file: SourceFile, options: SourceMapClonerOptions, result: CloneResult): void {
   if (!result.files.has(file.path)) {
     result.files.set(file.path, file.content);
-    result.stats.totalSize += file.content.length;
+    result.stats.totalSize += getUtf8ByteLength(file.content);
     return;
   }
 
@@ -75,7 +94,7 @@ function addSourceFileToResult(file: SourceFile, options: SourceMapClonerOptions
 
   if (existingContent.length === 0 && file.content.length > 0) {
     result.files.set(file.path, file.content);
-    result.stats.totalSize += file.content.length - existingContent.length;
+    result.stats.totalSize += getUtf8ByteLength(file.content) - getUtf8ByteLength(existingContent);
 
     if (options.verbose) {
       options.logger.info(`Replaced empty duplicate source: ${file.path}`);
@@ -90,10 +109,33 @@ function addSourceFileToResult(file: SourceFile, options: SourceMapClonerOptions
     return;
   }
 
-  const message = `Conflicting duplicate source content skipped: ${file.path}`;
-  result.errors.push({
-    file: file.path,
-    error: message,
+  const lastSlash = file.path.lastIndexOf("/");
+  const directory = lastSlash >= 0 ? file.path.slice(0, lastSlash + 1) : "";
+  const filename = lastSlash >= 0 ? file.path.slice(lastSlash + 1) : file.path;
+  const lastDot = filename.lastIndexOf(".");
+  const stem = lastDot > 0 ? filename.slice(0, lastDot) : filename;
+  const extension = lastDot > 0 ? filename.slice(lastDot) : "";
+  let conflictNumber = 2;
+  let conflictPath = `${directory}${stem}.conflict-${conflictNumber}${extension}`;
+
+  while (result.files.has(conflictPath)) {
+    if (result.files.get(conflictPath) === file.content) {
+      if (options.verbose) {
+        options.logger.warn(`Duplicate conflict file skipped: ${conflictPath}`);
+      }
+      return;
+    }
+    conflictNumber += 1;
+    conflictPath = `${directory}${stem}.conflict-${conflictNumber}${extension}`;
+  }
+
+  result.files.set(conflictPath, file.content);
+  result.stats.totalSize += getUtf8ByteLength(file.content);
+
+  const message = `Conflicting duplicate source preserved as ${conflictPath} (original path: ${file.path})`;
+  result.warnings.push({
+    file: conflictPath,
+    warning: message,
   });
   options.logger.warn(message);
 }
@@ -112,39 +154,62 @@ export async function fetchAndWriteSourcesForUrl(
     // Discover all JavaScript files from the URL
     const jsFiles = await discoverJavaScriptFiles(url, options);
 
-    // Filter out already processed files
-    const unseenFiles = jsFiles.filter((file) => !seenSources.has(file));
-    unseenFiles.forEach((file) => seenSources.add(file));
+    let pendingFiles = jsFiles.map((file) => ({ url: file, depth: 0 }));
+    const maxScriptDepth = options.maxScriptDepth ?? 3;
 
-    if (options.verbose) {
-      options.logger.info(`Found ${unseenFiles.length} new JavaScript files from ${url}`);
-    }
+    while (pendingFiles.length > 0) {
+      const unseenFiles = pendingFiles.filter((file) => !seenSources.has(file.url));
+      unseenFiles.forEach((file) => seenSources.add(file.url));
 
-    // Process files in parallel with concurrency limit
-    const fileArrays = await pMap(
-      unseenFiles,
-      async (jsFile) => {
-        try {
-          return await fetchAndParseJsFile(jsFile, options);
-        } catch (error) {
-          result.errors.push({
-            file: jsFile,
-            error: String(error),
-          });
-          if (options.verbose) {
-            console.error(error);
+      if (options.verbose && unseenFiles.length > 0) {
+        options.logger.info(
+          `Found ${unseenFiles.length} new JavaScript files at discovery depth ${unseenFiles[0]!.depth}`,
+        );
+      }
+
+      const processedFiles = await pMap(
+        unseenFiles,
+        async (jsFile) => {
+          try {
+            return await fetchAndParseJsFile(jsFile.url, options);
+          } catch (error) {
+            if (jsFile.depth === 0) {
+              result.errors.push({
+                file: jsFile.url,
+                error: String(error),
+              });
+            } else {
+              result.warnings.push({
+                file: jsFile.url,
+                warning: `Failed to fetch referenced JavaScript: ${error}`,
+              });
+            }
+            if (options.verbose) {
+              console.error(error);
+            }
+            return { files: [], referencedScripts: [] };
           }
+        },
+        { concurrency: options.concurrency ?? 20 },
+      );
+
+      for (const processedFile of processedFiles) {
+        for (const file of processedFile.files) {
+          addSourceFileToResult(file, options, result);
+        }
+      }
+
+      pendingFiles = processedFiles.flatMap((processedFile, index) => {
+        const parent = unseenFiles[index];
+        if (!parent || parent.depth >= maxScriptDepth) {
           return [];
         }
-      },
-      { concurrency: 20 },
-    );
 
-    // Flatten and add all files to the result
-    for (const files of fileArrays) {
-      for (const file of files) {
-        addSourceFileToResult(file, options, result);
-      }
+        return processedFile.referencedScripts.map((referencedUrl) => ({
+          url: referencedUrl,
+          depth: parent.depth + 1,
+        }));
+      });
     }
 
     options.logger.info(`Finished processing ${url}`);
@@ -207,13 +272,23 @@ export async function cloneSourceMaps(options: CloneOptions): Promise<CloneResul
     throw new Error("No URLs provided");
   }
 
-  const firstUrl = urls[0]!;
-  let baseUrl: URL;
+  const parsedUrls = urls.map((url) => {
+    try {
+      return new URL(url);
+    } catch (error) {
+      throw new InvalidURLError(url, error);
+    }
+  });
+  const baseUrl = parsedUrls[0]!;
 
-  try {
-    baseUrl = new URL(firstUrl);
-  } catch (error) {
-    throw new InvalidURLError(firstUrl, error);
+  if (options.concurrency !== undefined && (!Number.isInteger(options.concurrency) || options.concurrency < 1)) {
+    throw new Error(`Concurrency must be a positive integer, received: ${options.concurrency}`);
+  }
+  if (
+    options.maxScriptDepth !== undefined &&
+    (!Number.isInteger(options.maxScriptDepth) || options.maxScriptDepth < 0)
+  ) {
+    throw new Error(`Maximum script depth must be a non-negative integer, received: ${options.maxScriptDepth}`);
   }
 
   const result: CloneResult = {
@@ -224,6 +299,7 @@ export async function cloneSourceMaps(options: CloneOptions): Promise<CloneResul
       urls,
     },
     errors: [],
+    warnings: [],
   };
 
   const clonerOptions: SourceMapClonerOptions = {
@@ -233,6 +309,10 @@ export async function cloneSourceMaps(options: CloneOptions): Promise<CloneResul
     headers: mergeHeaders(defaultHeaders, options.headers),
     baseUrl,
     seenSources: new Set<string>(),
+    concurrency: options.concurrency ?? 20,
+    fetchMissingSources: options.fetchMissingSources ?? true,
+    discoverReferencedScripts: options.discoverReferencedScripts ?? true,
+    maxScriptDepth: options.maxScriptDepth ?? 3,
   };
 
   if (options.crawl) {
@@ -248,13 +328,14 @@ export async function cloneSourceMaps(options: CloneOptions): Promise<CloneResul
     // we want to remove root files that start with a question mark, which are likely invalid
     // and remove all webpack/runtime files and webpack/bootstrap
     for (const [filePath, content] of result.files.entries()) {
-      if (filePath.startsWith("?")) {
-        result.files.delete(filePath);
-        result.stats.totalSize -= content.length;
+      if (filePath.startsWith("?") && result.files.delete(filePath)) {
+        result.stats.totalSize -= getUtf8ByteLength(content);
       }
-      if (filePath.includes("webpack/runtime") || filePath.includes("webpack/bootstrap")) {
-        result.files.delete(filePath);
-        result.stats.totalSize -= content.length;
+      if (
+        (filePath.includes("webpack/runtime") || filePath.includes("webpack/bootstrap")) &&
+        result.files.delete(filePath)
+      ) {
+        result.stats.totalSize -= getUtf8ByteLength(content);
       }
     }
   }
@@ -266,6 +347,27 @@ export async function cloneSourceMaps(options: CloneOptions): Promise<CloneResul
   return result;
 }
 
+/** Resolve and filter links discovered while crawling. */
+export function getCrawlUrls(hrefs: Iterable<string>, pageUrl: string, allowedOrigins: Set<string>): string[] {
+  const urls = new Set<string>();
+
+  for (const href of hrefs) {
+    try {
+      const url = new URL(href, pageUrl);
+      if ((url.protocol !== "http:" && url.protocol !== "https:") || !allowedOrigins.has(url.origin)) {
+        continue;
+      }
+
+      url.hash = "";
+      urls.add(url.href);
+    } catch {
+      // Ignore malformed links and continue crawling the rest of the page.
+    }
+  }
+
+  return [...urls];
+}
+
 /**
  * Crawl websites and process discovered pages
  */
@@ -274,37 +376,40 @@ async function crawlAndProcess(urls: string[], options: SourceMapClonerOptions, 
   const Crawler = (await import("crawler")).default;
   const crawledUrls = new Set<string>();
   const promises: Promise<void>[] = [];
+  const allowedOrigins = new Set(urls.map((url) => new URL(url).origin));
 
   return new Promise((resolve, reject) => {
     const crawler = new Crawler({
       maxConnections: 10,
       headers: options.headers,
       callback(error, res, done) {
-        if (error || !res?.$) {
+        if (error) {
+          result.errors.push({
+            url: String(res?.options?.uri ?? res?.options?.url ?? ""),
+            error: String(error),
+          });
           // @ts-ignore
           done();
           return;
         }
 
-        const baseUrl = options.baseUrl!;
-        const anchorTags = res.$("a");
+        if (!res?.$) {
+          result.errors.push({
+            url: String(res?.options?.uri ?? res?.options?.url ?? ""),
+            error: "Crawler response did not contain a parseable document",
+          });
+          // @ts-ignore
+          done();
+          return;
+        }
 
-        const foundUrls = Array.from(anchorTags)
+        const anchorTags = res.$("a");
+        const foundHrefs = Array.from(anchorTags)
           // @ts-ignore
           .map((tag) => tag.attribs?.href)
-          .filter(Boolean)
-          .filter((href) => href && (href.startsWith(baseUrl.href) || href.startsWith("/"))) as string[];
-
-        const uniqueUrls = [
-          ...new Set(
-            foundUrls.map((href: string) => {
-              const url = new URL(href.startsWith("/") ? `${baseUrl.origin}${href}` : href);
-              url.hash = "";
-              url.search = "";
-              return url.href;
-            }),
-          ),
-        ];
+          .filter((href): href is string => typeof href === "string");
+        const currentPageUrl = String(res.options?.uri ?? res.options?.url ?? options.baseUrl);
+        const uniqueUrls = getCrawlUrls(foundHrefs, currentPageUrl, allowedOrigins);
 
         uniqueUrls.forEach((url) => {
           if (!crawledUrls.has(url)) {
@@ -316,7 +421,8 @@ async function crawlAndProcess(urls: string[], options: SourceMapClonerOptions, 
 
         // Also process the current page
 
-        for (const uri of [res?.options?.uri, res?.options?.url]) {
+        for (const rawUri of [res?.options?.uri, res?.options?.url]) {
+          const uri = rawUri ? String(rawUri) : "";
           if (uri && !crawledUrls.has(uri)) {
             crawledUrls.add(uri);
             promises.push(fetchAndWriteSourcesForUrl(uri, options, result));

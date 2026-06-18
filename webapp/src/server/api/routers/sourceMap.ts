@@ -33,6 +33,7 @@ export const sourceMapRouter = createTRPCRouter({
           files: filesArray,
           stats: result.stats,
           errors: result.errors,
+          warnings: result.warnings,
           directoryStructure,
         };
       } catch (error) {

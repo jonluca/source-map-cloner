@@ -8,6 +8,7 @@ import { cloneSourceMaps, type CloneOptions, type CloneResult } from "../core/pr
 import { createNodeFetch } from "../fetchers/index.js";
 import { InvalidURLError, formatError } from "../utils/errors.js";
 import { createConsoleLogger } from "../utils/default-logger.js";
+import { getUtf8ByteLength } from "../utils/bytes.js";
 
 const logger = createConsoleLogger();
 // Setup global error handlers
@@ -85,6 +86,26 @@ const args = yargs(hideBin(process.argv))
       description: "Remove known invalid files from the output directory",
       alias: "clean",
     },
+    concurrency: {
+      type: "number",
+      default: 20,
+      description: "Maximum number of JavaScript files to process at once",
+    },
+    fetchMissingSources: {
+      type: "boolean",
+      default: true,
+      description: "Fetch source files when a source map omits sourcesContent",
+    },
+    discoverReferencedScripts: {
+      type: "boolean",
+      default: true,
+      description: "Recursively discover JavaScript chunks referenced by fetched bundles",
+    },
+    maxScriptDepth: {
+      type: "number",
+      default: 3,
+      description: "Maximum recursive depth for JavaScript chunk discovery",
+    },
   })
   .example([
     ["$0 -u https://example.com", "Clone source maps from a single URL"],
@@ -130,6 +151,10 @@ const options: CloneOptions = {
   headers,
   verbose: args.verbose,
   cleanupKnownInvalidFiles: args.cleanupKnownInvalidFiles,
+  concurrency: args.concurrency,
+  fetchMissingSources: args.fetchMissingSources,
+  discoverReferencedScripts: args.discoverReferencedScripts,
+  maxScriptDepth: args.maxScriptDepth,
 };
 
 // Display configuration if verbose
@@ -157,9 +182,9 @@ async function writeFilesToDisk(result: CloneResult, targetDir: string, dryRun: 
     const fullPath = path.join(targetDir, filePath);
 
     if (dryRun) {
-      logger.info(`Would write: ${fullPath} (${content.length} bytes)`);
+      logger.info(`Would write: ${fullPath} (${getUtf8ByteLength(content)} bytes)`);
       filesWritten++;
-      bytesWritten += content.length;
+      bytesWritten += getUtf8ByteLength(content);
     } else {
       try {
         // Create directory if needed
@@ -170,11 +195,11 @@ async function writeFilesToDisk(result: CloneResult, targetDir: string, dryRun: 
         await fs.writeFile(fullPath, content, "utf-8");
 
         if (args.verbose) {
-          logger.info(`Wrote: ${fullPath} (${content.length} bytes)`);
+          logger.info(`Wrote: ${fullPath} (${getUtf8ByteLength(content)} bytes)`);
         }
 
         filesWritten++;
-        bytesWritten += content.length;
+        bytesWritten += getUtf8ByteLength(content);
       } catch (error) {
         logger.error(`Failed to write ${fullPath}: ${error}`);
       }
@@ -215,6 +240,14 @@ function displayErrors(result: CloneResult): void {
       } else {
         logger.warn(`  - ${error.error}`);
       }
+    }
+  }
+
+  if (result.warnings.length > 0) {
+    logger.warn(`Encountered ${result.warnings.length} non-fatal warnings:`);
+    for (const warning of result.warnings) {
+      const subject = warning.url ? `URL ${warning.url}` : warning.file ? `File ${warning.file}` : "Warning";
+      logger.warn(`  - ${subject}: ${warning.warning}`);
     }
   }
 }

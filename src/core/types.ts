@@ -43,6 +43,13 @@ export interface CloneResult {
     file?: string;
     error: string;
   }[];
+
+  /** Non-fatal conditions where output was still preserved. */
+  warnings: {
+    url?: string;
+    file?: string;
+    warning: string;
+  }[];
 }
 
 /**
@@ -69,6 +76,10 @@ export interface SourceMapClonerOptions {
   headers?: Record<string, string>;
   baseUrl?: URL;
   seenSources?: Set<string>;
+  concurrency?: number;
+  fetchMissingSources?: boolean;
+  discoverReferencedScripts?: boolean;
+  maxScriptDepth?: number;
 }
 
 /**
@@ -82,4 +93,12 @@ export interface CloneOptions {
   cleanupKnownInvalidFiles?: boolean;
   headers?: Record<string, string>;
   verbose?: boolean;
+  /** Maximum number of JavaScript files processed at once. Defaults to 20. */
+  concurrency?: number;
+  /** Fetch source files referenced by maps that omit sourcesContent. Defaults to true. */
+  fetchMissingSources?: boolean;
+  /** Recursively inspect fetched bundles for additional JavaScript chunks. Defaults to true. */
+  discoverReferencedScripts?: boolean;
+  /** Maximum referenced-script depth beyond scripts found in HTML. Defaults to 3. */
+  maxScriptDepth?: number;
 }
