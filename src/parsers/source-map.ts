@@ -142,6 +142,7 @@ export function extractSourceFiles(
   const url = new URL(sourceUrl);
   const pathname = url.pathname;
   const files: SourceFile[] = [];
+  let missingContentCount = 0;
 
   for (let i = 0; i < parsedMap.sources.length; i++) {
     const source = parsedMap.sources[i];
@@ -156,9 +157,7 @@ export function extractSourceFiles(
     }
 
     if (sourceContent === null || sourceContent === undefined) {
-      if (options.verbose) {
-        options.logger.warn(`No source content for ${source}`);
-      }
+      missingContentCount += 1;
       continue;
     }
 
@@ -182,6 +181,10 @@ export function extractSourceFiles(
         console.error(error);
       }
     }
+  }
+
+  if (options.verbose && missingContentCount > 0) {
+    options.logger.warn(`Skipped ${missingContentCount} source map entries without source content`);
   }
 
   return files;

@@ -20,6 +20,8 @@ import { getUtf8ByteLength } from "../utils/bytes.js";
 interface ProcessedJavaScriptFile {
   files: SourceFile[];
   referencedScripts: string[];
+  sourceMapFound: boolean;
+  diagnostics: { file: string; warning: string }[];
 }
 
 async function fetchAndParseJsFile(url: string, options: SourceMapClonerOptions): Promise<ProcessedJavaScriptFile> {
@@ -27,7 +29,14 @@ async function fetchAndParseJsFile(url: string, options: SourceMapClonerOptions)
   const { body: data, requestUrl } = await fetch(url, { headers });
   const bundleUrl = new URL(requestUrl, url).href;
   const { sourceMappingURL } = getSourceMappingURL(data);
-  const referencedScripts = options.discoverReferencedScripts ? extractReferencedJavaScriptUrls(data, bundleUrl) : [];
+  const referencedScripts = options.discoverReferencedScripts
+    ? extractReferencedJavaScriptUrls(data, bundleUrl).filter(
+        (referencedUrl) =>
+          options.followCrossOriginScripts || new URL(referencedUrl).origin === new URL(bundleUrl).origin,
+      )
+    : [];
+  let sourceMapFound = false;
+  const diagnostics: { file: string; warning: string }[] = [];
 
   if (verbose && sourceMappingURL) {
     options.logger.info(`Found source map url: ${sourceMappingURL}`);
@@ -56,13 +65,18 @@ async function fetchAndParseJsFile(url: string, options: SourceMapClonerOptions)
       const { sourceContent, sourceUrl } = await fetchFromURL(sourceMapUrl, bundleUrl, headers || {}, fetch);
 
       if (sourceContent && !sourceContent.trimStart().startsWith("<")) {
+        sourceMapFound = true;
         if (verbose) {
           options.logger.info(`Found source map content: ${sourceMapUrl}`);
         }
         const files = await processSourceMap(sourceContent, sourceUrl, options);
         if (files.length > 0) {
-          return { files, referencedScripts };
+          return { files, referencedScripts, sourceMapFound, diagnostics: [] };
         }
+        diagnostics.push({
+          file: sourceUrl,
+          warning: "Source map was found but contained no extractable source content",
+        });
       } else if (verbose) {
         options.logger.info(`No source map content for: ${sourceMapUrl}`);
       }
@@ -73,7 +87,7 @@ async function fetchAndParseJsFile(url: string, options: SourceMapClonerOptions)
     }
   }
 
-  return { files: [], referencedScripts };
+  return { files: [], referencedScripts, sourceMapFound, diagnostics };
 }
 
 function addSourceFileToResult(file: SourceFile, options: SourceMapClonerOptions, result: CloneResult): void {
@@ -156,9 +170,29 @@ export async function fetchAndWriteSourcesForUrl(
 
     let pendingFiles = jsFiles.map((file) => ({ url: file, depth: 0 }));
     const maxScriptDepth = options.maxScriptDepth ?? 3;
+    const maxScripts = options.maxScripts ?? 500;
 
     while (pendingFiles.length > 0) {
-      const unseenFiles = pendingFiles.filter((file) => !seenSources.has(file.url));
+      const batchUrls = new Set<string>();
+      const unseenCandidates = pendingFiles.filter((file) => {
+        if (seenSources.has(file.url) || batchUrls.has(file.url)) {
+          return false;
+        }
+        batchUrls.add(file.url);
+        return true;
+      });
+      const remainingScriptCapacity = Math.max(0, maxScripts - seenSources.size);
+      const unseenFiles = unseenCandidates.slice(0, remainingScriptCapacity);
+
+      if (
+        unseenCandidates.length > unseenFiles.length &&
+        !result.warnings.some((warning) => warning.warning.startsWith("JavaScript discovery limit reached"))
+      ) {
+        result.warnings.push({
+          warning: `JavaScript discovery limit reached (${maxScripts}); additional referenced chunks were skipped`,
+        });
+      }
+
       unseenFiles.forEach((file) => seenSources.add(file.url));
 
       if (options.verbose && unseenFiles.length > 0) {
@@ -187,13 +221,19 @@ export async function fetchAndWriteSourcesForUrl(
             if (options.verbose) {
               console.error(error);
             }
-            return { files: [], referencedScripts: [] };
+            return { files: [], referencedScripts: [], sourceMapFound: false, diagnostics: [] };
           }
         },
         { concurrency: options.concurrency ?? 20 },
       );
 
       for (const processedFile of processedFiles) {
+        result.stats.scriptsProcessed += 1;
+        if (processedFile.sourceMapFound) {
+          result.stats.sourceMapsFound += 1;
+        }
+        result.warnings.push(...processedFile.diagnostics);
+
         for (const file of processedFile.files) {
           addSourceFileToResult(file, options, result);
         }
@@ -290,12 +330,17 @@ export async function cloneSourceMaps(options: CloneOptions): Promise<CloneResul
   ) {
     throw new Error(`Maximum script depth must be a non-negative integer, received: ${options.maxScriptDepth}`);
   }
+  if (options.maxScripts !== undefined && (!Number.isInteger(options.maxScripts) || options.maxScripts < 1)) {
+    throw new Error(`Maximum scripts must be a positive integer, received: ${options.maxScripts}`);
+  }
 
   const result: CloneResult = {
     files: new Map<string, string>(),
     stats: {
       totalFiles: 0,
       totalSize: 0,
+      scriptsProcessed: 0,
+      sourceMapsFound: 0,
       urls,
     },
     errors: [],
@@ -313,6 +358,8 @@ export async function cloneSourceMaps(options: CloneOptions): Promise<CloneResul
     fetchMissingSources: options.fetchMissingSources ?? true,
     discoverReferencedScripts: options.discoverReferencedScripts ?? true,
     maxScriptDepth: options.maxScriptDepth ?? 3,
+    maxScripts: options.maxScripts ?? 500,
+    followCrossOriginScripts: options.followCrossOriginScripts ?? false,
   };
 
   if (options.crawl) {

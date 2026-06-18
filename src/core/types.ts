@@ -31,6 +31,8 @@ export interface CloneResult {
   stats: {
     totalFiles: number;
     totalSize: number;
+    scriptsProcessed: number;
+    sourceMapsFound: number;
     urls: string[];
     duration?: number;
   };
@@ -80,6 +82,8 @@ export interface SourceMapClonerOptions {
   fetchMissingSources?: boolean;
   discoverReferencedScripts?: boolean;
   maxScriptDepth?: number;
+  maxScripts?: number;
+  followCrossOriginScripts?: boolean;
 }
 
 /**
@@ -101,4 +105,8 @@ export interface CloneOptions {
   discoverReferencedScripts?: boolean;
   /** Maximum referenced-script depth beyond scripts found in HTML. Defaults to 3. */
   maxScriptDepth?: number;
+  /** Maximum JavaScript files processed across the operation. Defaults to 500. */
+  maxScripts?: number;
+  /** Follow cross-origin references found inside bundles. Defaults to false. */
+  followCrossOriginScripts?: boolean;
 }

@@ -7,6 +7,10 @@ const { JSDOM } = jsdom;
 // Regex patterns for finding JavaScript files
 const JS_FILE_REGEX = /["']([^"'<>]+?\.(?:js|mjs|cjs)(?:[?#][^"'<>]*)?)["']/gi;
 const ESCAPED_JS_FILE_REGEX = /\\["']([^"'<>\\]+?\.(?:js|mjs|cjs)(?:[?#][^"'<>\\]*)?)\\["']/gi;
+const DYNAMIC_IMPORT_REGEX = /\bimport\s*\(\s*["']([^"']+\.(?:js|mjs|cjs)(?:[?#][^"']*)?)["']/gi;
+const STATIC_IMPORT_REGEX =
+  /\b(?:import|export)\s+(?:[^"']*?\s+from\s*)?["']([^"']+\.(?:js|mjs|cjs)(?:[?#][^"']*)?)["']/gi;
+const URL_CONSTRUCTOR_REGEX = /\bnew\s+URL\s*\(\s*["']([^"']+\.(?:js|mjs|cjs)(?:[?#][^"']*)?)["']\s*,/gi;
 
 function isJavaScriptUrl(url: string): boolean {
   try {
@@ -143,13 +147,98 @@ function findNextAssetBase(urls: Iterable<string>): string | undefined {
  * common bundlers.
  */
 export function extractReferencedJavaScriptUrls(content: string, bundleUrl: string): string[] {
-  return [...new Set(extractJsUrlsFromText(content, bundleUrl, findNextAssetBase([bundleUrl])))];
+  return extractReferencedJavaScriptUrlsWithBase(content, bundleUrl, findNextAssetBase([bundleUrl]));
+}
+
+function extractReferencedJavaScriptUrlsWithBase(
+  content: string,
+  bundleUrl: string,
+  frameworkAssetBase?: string,
+): string[] {
+  const syntaxReferences = [DYNAMIC_IMPORT_REGEX, STATIC_IMPORT_REGEX, URL_CONSTRUCTOR_REGEX].flatMap((regex) =>
+    [...content.matchAll(regex)].flatMap((match) => (match[1] ? [match[1]] : [])),
+  );
+  const manifestReferences = extractJsPathMatches(content)
+    .filter((match) => isStandaloneStringReference(content, match))
+    .map((match) => match.path)
+    .filter(isLikelyManifestReference);
+
+  return [
+    ...new Set(
+      [...syntaxReferences, ...manifestReferences].flatMap((reference) => {
+        try {
+          const resolutionBase = frameworkAssetBase && reference.startsWith("static/") ? frameworkAssetBase : bundleUrl;
+          return [new URL(reference, resolutionBase).href];
+        } catch {
+          return [];
+        }
+      }),
+    ),
+  ];
+}
+
+interface JavaScriptPathMatch {
+  path: string;
+  start: number;
+  end: number;
+}
+
+function extractJsPathMatches(content: string): JavaScriptPathMatch[] {
+  return [JS_FILE_REGEX, ESCAPED_JS_FILE_REGEX].flatMap((regex) =>
+    [...content.matchAll(regex)].flatMap((match) =>
+      match[1] === undefined || match.index === undefined
+        ? []
+        : [{ path: match[1], start: match.index, end: match.index + match[0].length }],
+    ),
+  );
+}
+
+function isStandaloneStringReference(content: string, match: JavaScriptPathMatch): boolean {
+  const previousCharacter = content
+    .slice(0, match.start)
+    .match(/\S\s*$/)?.[0]
+    ?.trim();
+  const nextCharacter = content
+    .slice(match.end)
+    .match(/^\s*\S/)?.[0]
+    ?.trim();
+  return previousCharacter !== "+" && nextCharacter !== "+";
+}
+
+function isLikelyManifestReference(reference: string): boolean {
+  if (
+    /\s/.test(reference) ||
+    (reference.startsWith(".") && !reference.startsWith("./") && !reference.startsWith("../"))
+  ) {
+    return false;
+  }
+
+  if (
+    reference.startsWith("http://") ||
+    reference.startsWith("https://") ||
+    reference.startsWith("//") ||
+    reference.startsWith("/_next/") ||
+    reference.startsWith("/_nuxt/") ||
+    reference.startsWith("/_app/") ||
+    reference.startsWith("/_astro/") ||
+    reference.startsWith("/assets/") ||
+    reference.startsWith("/build/") ||
+    reference.startsWith("/chunks/") ||
+    reference.startsWith("/static/") ||
+    reference.startsWith("static/chunks/") ||
+    reference.startsWith("assets/")
+  ) {
+    return true;
+  }
+
+  // Bundler chunk tables commonly contain only a hashed filename rather than
+  // an import expression. Requiring a substantial hash avoids treating source
+  // filenames and documentation samples as network assets.
+  return /(?:^|\/)[^/]*[.-][A-Za-z0-9_-]{6,}\.(?:js|mjs|cjs)(?:[?#].*)?$/i.test(reference);
 }
 
 function extractJsPathsFromText(content: string): string[] {
-  const paths = [...content.matchAll(JS_FILE_REGEX), ...content.matchAll(ESCAPED_JS_FILE_REGEX)].flatMap((match) =>
-    match[1] ? [match[1]] : [],
-  );
+  const paths = extractJsPathMatches(content).map((match) => match.path);
   return [...new Set(paths)];
 }
 
@@ -278,7 +367,7 @@ export async function discoverJavaScriptFiles(url: string, options: SourceMapClo
     // Extract JS URLs using regex. App Router Flight payloads use paths such
     // as "static/chunks/app/page.js", relative to the _next asset root rather
     // than to the current document.
-    const textUrls = extractJsUrlsFromText(html, documentUrl, findNextAssetBase(htmlUrls));
+    const textUrls = extractReferencedJavaScriptUrlsWithBase(html, documentUrl, findNextAssetBase(htmlUrls));
     jsFiles.push(...textUrls);
 
     // Convert to absolute URLs

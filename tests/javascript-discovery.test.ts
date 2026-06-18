@@ -157,12 +157,27 @@ test("bundle references cover common framework asset layouts", () => {
 test("Next bundles resolve static chunk strings from their asset root", () => {
   assert.deepEqual(
     extractReferencedJavaScriptUrls(
-      'const chunks = ["static/chunks/app/lazy.js", "./relative.js"]',
+      'const chunks = ["static/chunks/app/lazy.js"]; import("./relative.js")',
       "https://cdn.example.com/prefix/_next/static/chunks/app/page.js",
-    ),
+    ).toSorted(),
     [
-      "https://cdn.example.com/prefix/_next/static/chunks/app/lazy.js",
       "https://cdn.example.com/prefix/_next/static/chunks/app/relative.js",
-    ],
+      "https://cdn.example.com/prefix/_next/static/chunks/app/lazy.js",
+    ].toSorted(),
   );
+});
+
+test("bundle discovery ignores concatenated fragments, source catalogs, and error-message filenames", () => {
+  const content = `
+    analytics.src = protocol + '.google-analytics.com/ga.js';
+    const samples = ["./creating-an-editor/hello-world/sample.js"];
+    throw new Error("mobx.map requires a polyfill from core-js/es6/map.js");
+    import("./real-lazy.js");
+    const chunks = ["route.abc12345.js"];
+  `;
+
+  assert.deepEqual(extractReferencedJavaScriptUrls(content, "https://example.com/assets/app.js").toSorted(), [
+    "https://example.com/assets/real-lazy.js",
+    "https://example.com/assets/route.abc12345.js",
+  ]);
 });

@@ -28,6 +28,26 @@ const createChunkGraphFetch =
     return { body, statusCode: 200, requestUrl: url };
   };
 
+const createCrossOriginFetch =
+  (requests: string[]): FetchFunction =>
+  async (url) => {
+    requests.push(url);
+    if (url === "https://example.com") {
+      return { body: '<script src="/entry.js"></script>', statusCode: 200, requestUrl: url };
+    }
+    if (url === "https://example.com/entry.js") {
+      return {
+        body: 'import("https://cdn.example.net/optional.js")',
+        statusCode: 200,
+        requestUrl: url,
+      };
+    }
+    if (url === "https://cdn.example.net/optional.js") {
+      return { body: "compiled", statusCode: 200, requestUrl: url };
+    }
+    throw new Error(`Unavailable: ${url}`);
+  };
+
 test("failed page and JavaScript requests are included in result errors", async () => {
   const pageFailure = await cloneSourceMaps({
     urls: "https://example.com",
@@ -156,6 +176,10 @@ test("all input URLs and concurrency are validated before fetching", async () =>
     cloneSourceMaps({ urls: "https://example.com", fetch: successfulFetch, logger, maxScriptDepth: -1 }),
     /script depth/i,
   );
+  await assert.rejects(
+    cloneSourceMaps({ urls: "https://example.com", fetch: successfulFetch, logger, maxScripts: 0 }),
+    /maximum scripts/i,
+  );
 });
 
 test("referenced JavaScript chunks are followed recursively", async () => {
@@ -270,4 +294,79 @@ test("unavailable recursively discovered chunks are non-fatal warnings", async (
   assert.equal(result.errors.length, 0);
   assert.equal(result.warnings.length, 1);
   assert.equal(result.warnings[0]?.file, "https://example.com/optional.js");
+});
+
+test("maps without recoverable source content produce diagnostics and map statistics", async () => {
+  const responses: Record<string, string> = {
+    "https://example.com/bundle.js": "//# sourceMappingURL=bundle.js.map",
+    "https://example.com/bundle.js.map": JSON.stringify({
+      version: 3,
+      sources: ["webpack://Example/./src/app.ts"],
+      names: [],
+      mappings: "AAAA",
+    }),
+  };
+
+  const result = await cloneSourceMaps({
+    urls: "https://example.com/bundle.js",
+    fetch: async (url) => {
+      const body = responses[url];
+      if (body === undefined) {
+        throw new Error(`Unavailable: ${url}`);
+      }
+      return { body, statusCode: 200, requestUrl: url };
+    },
+    logger,
+  });
+
+  assert.equal(result.files.size, 0);
+  assert.equal(result.stats.scriptsProcessed, 1);
+  assert.equal(result.stats.sourceMapsFound, 1);
+  assert.equal(result.warnings.length, 1);
+  assert.match(result.warnings[0]?.warning ?? "", /no extractable source content/);
+});
+
+test("script discovery is deduplicated and bounded by maxScripts", async () => {
+  const requests: string[] = [];
+  const result = await cloneSourceMaps({
+    urls: "https://example.com",
+    maxScripts: 2,
+    fetch: async (url) => {
+      requests.push(url);
+      if (url === "https://example.com") {
+        return { body: '<script src="/entry.js"></script>', statusCode: 200, requestUrl: url };
+      }
+      if (url === "https://example.com/entry.js") {
+        return {
+          body: 'import("./one.js"); import("./one.js"); import("./two.js")',
+          statusCode: 200,
+          requestUrl: url,
+        };
+      }
+      if (url === "https://example.com/one.js" || url === "https://example.com/two.js") {
+        return { body: "compiled", statusCode: 200, requestUrl: url };
+      }
+      throw new Error(`Unavailable: ${url}`);
+    },
+    logger,
+  });
+
+  assert.equal(requests.filter((url) => url === "https://example.com/one.js").length, 1);
+  assert.equal(result.stats.scriptsProcessed, 2);
+  assert.ok(result.warnings.some((warning) => warning.warning.startsWith("JavaScript discovery limit reached")));
+});
+
+test("recursive discovery stays on the bundle origin unless explicitly enabled", async () => {
+  const defaultRequests: string[] = [];
+  await cloneSourceMaps({ urls: "https://example.com", fetch: createCrossOriginFetch(defaultRequests), logger });
+  assert.equal(defaultRequests.includes("https://cdn.example.net/optional.js"), false);
+
+  const crossOriginRequests: string[] = [];
+  await cloneSourceMaps({
+    urls: "https://example.com",
+    fetch: createCrossOriginFetch(crossOriginRequests),
+    logger,
+    followCrossOriginScripts: true,
+  });
+  assert.equal(crossOriginRequests.includes("https://cdn.example.net/optional.js"), true);
 });

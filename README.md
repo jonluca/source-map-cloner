@@ -49,6 +49,8 @@ npx source-map-cloner -u https://example.com --concurrency 8 --no-fetch-missing-
 # Limit recursive chunk discovery, or disable it entirely
 npx source-map-cloner -u https://example.com --max-script-depth 2
 npx source-map-cloner -u https://example.com --no-discover-referenced-scripts
+npx source-map-cloner -u https://example.com --max-scripts 250
+npx source-map-cloner -u https://example.com --follow-cross-origin-scripts
 ```
 
 ### Programmatic API
@@ -195,6 +197,8 @@ Main function to clone source maps from URLs.
 - `fetchMissingSources?`: Fetch referenced source files when `sourcesContent` is absent (defaults to `true`)
 - `discoverReferencedScripts?`: Follow JavaScript referenced by fetched bundles (defaults to `true`)
 - `maxScriptDepth?`: Maximum recursive chunk-discovery depth (defaults to `3`)
+- `maxScripts?`: Maximum JavaScript files processed across the run (defaults to `500`)
+- `followCrossOriginScripts?`: Recursively follow cross-origin bundle references (defaults to `false`)
 
 **Returns:** `CloneResult` with extracted files, statistics, and errors
 
@@ -230,6 +234,8 @@ interface CloneResult {
   stats: {
     totalFiles: number;
     totalSize: number;
+    scriptsProcessed: number;
+    sourceMapsFound: number;
     urls: string[];
     duration?: number;
   };
@@ -296,6 +302,14 @@ npm run build
 
 ```bash
 npm run typecheck
+```
+
+### Live Source Map Smoke Tests
+
+The optional live suite checks versioned CDN bundles for exact source reconciliation and exercises full-page discovery against public sites. It requires network access.
+
+```bash
+pnpm test:live
 ```
 
 ### Running in Development

@@ -35,6 +35,7 @@
     "lint": "oxlint .",
     "lint:fix": "oxlint . --fix",
     "test": "tsx --test tests/*.test.ts",
+    "test:live": "tsx scripts/test-live-source-maps.ts",
     "typecheck": "tsc --noEmit && pnpm --filter webapp typecheck",
     "fetch-source": "tsx src/cli/index.ts",
     "dev-webapp": "pnpm --filter webapp dev"

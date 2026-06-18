@@ -106,6 +106,16 @@ const args = yargs(hideBin(process.argv))
       default: 3,
       description: "Maximum recursive depth for JavaScript chunk discovery",
     },
+    maxScripts: {
+      type: "number",
+      default: 500,
+      description: "Maximum number of JavaScript files processed across the run",
+    },
+    followCrossOriginScripts: {
+      type: "boolean",
+      default: false,
+      description: "Follow cross-origin JavaScript references found inside bundles",
+    },
   })
   .example([
     ["$0 -u https://example.com", "Clone source maps from a single URL"],
@@ -155,6 +165,8 @@ const options: CloneOptions = {
   fetchMissingSources: args.fetchMissingSources,
   discoverReferencedScripts: args.discoverReferencedScripts,
   maxScriptDepth: args.maxScriptDepth,
+  maxScripts: args.maxScripts,
+  followCrossOriginScripts: args.followCrossOriginScripts,
 };
 
 // Display configuration if verbose
@@ -264,6 +276,8 @@ async function main() {
     // Display statistics
     logger.info(`=== Extraction Complete ===`);
     logger.info(`  Total files extracted: ${result.stats.totalFiles}`);
+    logger.info(`  JavaScript files processed: ${result.stats.scriptsProcessed}`);
+    logger.info(`  Source maps found: ${result.stats.sourceMapsFound}`);
     logger.info(`  Total size: ${formatBytes(result.stats.totalSize)}`);
     logger.info(`  Duration: ${((result.stats.duration ?? 0) / 1000).toFixed(2)}s`);
 
