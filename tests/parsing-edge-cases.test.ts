@@ -21,6 +21,12 @@ test("the final sourceMappingURL comment wins across line and block forms", () =
   assert.equal(getSourceMappingURL(code).sourceMappingURL, "final.js.map");
 });
 
+test("the final sourceMappingURL comment wins when comments share a minified line", () => {
+  const code = "void 0;/*# sourceMappingURL=old.map *//*# sourceMappingURL=final.map */";
+
+  assert.equal(getSourceMappingURL(code).sourceMappingURL, "final.map");
+});
+
 test("sourceMappingURL parsing tolerates legacy @ comments and encoded spaces", () => {
   assert.equal(
     getSourceMappingURL("//@ sourceMappingURL=maps/app%20bundle.map").sourceMappingURL,

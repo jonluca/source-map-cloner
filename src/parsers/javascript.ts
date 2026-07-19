@@ -7,7 +7,8 @@ const { JSDOM } = jsdom;
 // Regex patterns for finding JavaScript files
 const JS_FILE_REGEX = /["']([^"'<>]+?\.(?:js|mjs|cjs)(?:[?#][^"'<>]*)?)["']/gi;
 const ESCAPED_JS_FILE_REGEX = /\\["']([^"'<>\\]+?\.(?:js|mjs|cjs)(?:[?#][^"'<>\\]*)?)\\["']/gi;
-const DYNAMIC_IMPORT_REGEX = /\bimport\s*\(\s*["']([^"']+\.(?:js|mjs|cjs)(?:[?#][^"']*)?)["']/gi;
+const DYNAMIC_IMPORT_REGEX =
+  /\bimport\s*\((?:\s|\/\*[\s\S]*?\*\/|\/\/[^\r\n]*(?:\r?\n|$))*["']([^"']+\.(?:js|mjs|cjs)(?:[?#][^"']*)?)["']/gi;
 const STATIC_IMPORT_REGEX =
   /\b(?:import|export)\s+(?:[^"']*?\s+from\s*)?["']([^"']+\.(?:js|mjs|cjs)(?:[?#][^"']*)?)["']/gi;
 const URL_CONSTRUCTOR_REGEX = /\bnew\s+URL\s*\(\s*["']([^"']+\.(?:js|mjs|cjs)(?:[?#][^"']*)?)["']\s*,/gi;
