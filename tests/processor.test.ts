@@ -163,6 +163,32 @@ test("crawl URL resolution includes relative links and filters other origins", (
   ]);
 });
 
+test("crawl mode routes page discovery through the supplied fetcher", async () => {
+  const requests: string[] = [];
+  const responses: Record<string, string> = {
+    "https://crawl.test/": '<a href="/child">Child</a>',
+    "https://crawl.test/child": "<main>Done</main>",
+  };
+
+  const result = await cloneSourceMaps({
+    urls: "https://crawl.test/",
+    crawl: true,
+    fetch: async (url) => {
+      requests.push(url);
+      const body = responses[url];
+      if (body === undefined) {
+        throw new Error(`Unexpected request: ${url}`);
+      }
+      return { body, statusCode: 200, requestUrl: url };
+    },
+    logger,
+  });
+
+  assert.equal(result.errors.length, 0);
+  assert.ok(requests.includes("https://crawl.test/"));
+  assert.ok(requests.includes("https://crawl.test/child"));
+});
+
 test("all input URLs and concurrency are validated before fetching", async () => {
   await assert.rejects(
     cloneSourceMaps({ urls: ["https://example.com", "not a url"], fetch: successfulFetch, logger }),

@@ -74,6 +74,35 @@ test("inline base64 source maps are extracted without a map request", async () =
   assert.deepEqual(requests, ["https://example.com", "https://example.com/app.js"]);
 });
 
+test("percent-encoded inline maps preserve percent sequences in source text", async () => {
+  const map = encodeURIComponent(
+    JSON.stringify({
+      version: 3,
+      sources: ["src/percent.ts"],
+      sourcesContent: ['export const literal = "%41";'],
+      names: [],
+      mappings: "",
+    }),
+  );
+  const fetch: FetchFunction = async (url) => {
+    if (url === "https://example.com") {
+      return { body: '<script src="/app.js"></script>', statusCode: 200, requestUrl: url };
+    }
+    if (url === "https://example.com/app.js") {
+      return {
+        body: `//# sourceMappingURL=data:application/json;charset=utf-8,${map}`,
+        statusCode: 200,
+        requestUrl: url,
+      };
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  };
+
+  const result = await cloneSourceMaps({ urls: "https://example.com", fetch, logger });
+
+  assert.equal(result.files.get("src/percent.ts"), 'export const literal = "%41";');
+});
+
 test("redirected source maps resolve missing source files from their final URL", async () => {
   const requests: string[] = [];
   const fetch: FetchFunction = async (url) => {

@@ -20,8 +20,17 @@
       "types": "./dist/src/cli/index.d.ts"
     },
     "./fetchers": {
-      "import": "./dist/src/fetchers/index.js",
-      "types": "./dist/src/fetchers/index.d.ts"
+      "types": "./dist/src/fetchers/index.d.ts",
+      "browser": "./dist/src/fetchers/browser.js",
+      "import": "./dist/src/fetchers/index.js"
+    },
+    "./fetchers/browser": {
+      "types": "./dist/src/fetchers/browser.d.ts",
+      "import": "./dist/src/fetchers/browser.js"
+    },
+    "./fetchers/node": {
+      "types": "./dist/src/fetchers/node.d.ts",
+      "import": "./dist/src/fetchers/node.js"
     },
     "./src/*": {
       "import": "./src/*",
@@ -51,7 +60,6 @@
     "provenance": true
   },
   "dependencies": {
-    "crawler": "^2.0.2",
     "got": "^15.0.5",
     "iconv-lite": "^0.7.2",
     "jsdom": "^29.1.1",
@@ -64,7 +72,6 @@
     "yargs": "^18.0.0"
   },
   "devDependencies": {
-    "@types/crawler": "^1.2.7",
     "@types/jsdom": "^28.0.1",
     "@types/node": "25.6.2",
     "@types/yargs": "^17.0.35",

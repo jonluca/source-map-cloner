@@ -7,9 +7,10 @@ const { JSDOM } = jsdom;
 // Regex patterns for finding JavaScript files
 const JS_FILE_REGEX = /["']([^"'<>]+?\.(?:js|mjs|cjs)(?:[?#][^"'<>]*)?)["']/gi;
 const ESCAPED_JS_FILE_REGEX = /\\["']([^"'<>\\]+?\.(?:js|mjs|cjs)(?:[?#][^"'<>\\]*)?)\\["']/gi;
-const DYNAMIC_IMPORT_REGEX = /\bimport\s*\(\s*["']([^"']+\.(?:js|mjs|cjs)(?:[?#][^"']*)?)["']/gi;
+const DYNAMIC_IMPORT_REGEX =
+  /\bimport\s*\(\s*(?:(?:\/\*[\s\S]*?\*\/|\/\/[^\r\n]*(?:\r?\n|$))\s*)*["']([^"']+\.(?:js|mjs|cjs)(?:[?#][^"']*)?)["']/gi;
 const STATIC_IMPORT_REGEX =
-  /\b(?:import|export)\s+(?:[^"']*?\s+from\s*)?["']([^"']+\.(?:js|mjs|cjs)(?:[?#][^"']*)?)["']/gi;
+  /\b(?:import|export)\s+(?:[^"']*?\bfrom\s*)?["']([^"']+\.(?:js|mjs|cjs)(?:[?#][^"']*)?)["']/gi;
 const URL_CONSTRUCTOR_REGEX = /\bnew\s+URL\s*\(\s*["']([^"']+\.(?:js|mjs|cjs)(?:[?#][^"']*)?)["']\s*,/gi;
 
 function isJavaScriptUrl(url: string): boolean {
@@ -91,6 +92,19 @@ export function extractJsUrlsFromHtml(
   }
 
   return urls;
+}
+
+/** Extract raw anchor targets while retaining the document's base URL semantics. */
+export function extractLinkUrlsFromHtml(html: string, pageUrl: string): string[] {
+  const dom = new JSDOM(html, { url: pageUrl });
+  try {
+    return [...dom.window.document.querySelectorAll("a[href]")].flatMap((anchor) => {
+      const href = anchor.getAttribute("href");
+      return href ? [href] : [];
+    });
+  } finally {
+    dom.window.close();
+  }
 }
 
 /**

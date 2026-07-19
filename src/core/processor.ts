@@ -2,6 +2,7 @@ import pMap from "p-map";
 import { processSourceMap } from "../parsers/source-map.js";
 import {
   discoverJavaScriptFiles,
+  extractLinkUrlsFromHtml,
   extractReferencedJavaScriptUrls,
   getFallbackSourceMapUrl,
 } from "../parsers/javascript.js";
@@ -419,85 +420,33 @@ export function getCrawlUrls(hrefs: Iterable<string>, pageUrl: string, allowedOr
  * Crawl websites and process discovered pages
  */
 async function crawlAndProcess(urls: string[], options: SourceMapClonerOptions, result: CloneResult): Promise<void> {
-  // Dynamic import for crawler (Node.js only)
-  const Crawler = (await import("crawler")).default;
-  const crawledUrls = new Set<string>();
-  const promises: Promise<void>[] = [];
+  const queuedUrls = new Set(urls);
+  const pendingUrls = [...urls];
   const allowedOrigins = new Set(urls.map((url) => new URL(url).origin));
 
-  return new Promise((resolve, reject) => {
-    const crawler = new Crawler({
-      maxConnections: 10,
-      headers: options.headers,
-      callback(error, res, done) {
-        if (error) {
-          result.errors.push({
-            url: String(res?.options?.uri ?? res?.options?.url ?? ""),
-            error: String(error),
-          });
-          // @ts-ignore
-          done();
-          return;
+  while (pendingUrls.length > 0) {
+    const url = pendingUrls.shift()!;
+    try {
+      const response = await options.fetch(url, { headers: options.headers ?? {} });
+      const pageUrl = new URL(response.requestUrl, url).href;
+      const discoveredUrls = getCrawlUrls(extractLinkUrlsFromHtml(response.body, pageUrl), pageUrl, allowedOrigins);
+      for (const discoveredUrl of discoveredUrls) {
+        if (!queuedUrls.has(discoveredUrl)) {
+          queuedUrls.add(discoveredUrl);
+          pendingUrls.push(discoveredUrl);
         }
-
-        if (!res?.$) {
-          result.errors.push({
-            url: String(res?.options?.uri ?? res?.options?.url ?? ""),
-            error: "Crawler response did not contain a parseable document",
-          });
-          // @ts-ignore
-          done();
-          return;
-        }
-
-        const anchorTags = res.$("a");
-        const foundHrefs = Array.from(anchorTags)
-          // @ts-ignore
-          .map((tag) => tag.attribs?.href)
-          .filter((href): href is string => typeof href === "string");
-        const currentPageUrl = String(res.options?.uri ?? res.options?.url ?? options.baseUrl);
-        const uniqueUrls = getCrawlUrls(foundHrefs, currentPageUrl, allowedOrigins);
-
-        uniqueUrls.forEach((url) => {
-          if (!crawledUrls.has(url)) {
-            crawledUrls.add(url);
-            promises.push(fetchAndWriteSourcesForUrl(url, options, result));
-            crawler.add(url);
-          }
-        });
-
-        // Also process the current page
-
-        for (const rawUri of [res?.options?.uri, res?.options?.url]) {
-          const uri = rawUri ? String(rawUri) : "";
-          if (uri && !crawledUrls.has(uri)) {
-            crawledUrls.add(uri);
-            promises.push(fetchAndWriteSourcesForUrl(uri, options, result));
-          }
-        }
-
-        // @ts-ignore
-        done();
-      },
-    });
-
-    crawler.on("drain", async () => {
-      try {
-        await Promise.all(promises);
-        if (options.verbose) {
-          options.logger.info(`Finished crawling ${options.baseUrl}`);
-        }
-        resolve();
-      } catch (error) {
-        reject(error);
       }
-    });
-
-    // Start crawling from initial URLs
-    for (const url of urls) {
-      crawler.add(url);
+    } catch (error) {
+      result.errors.push({ url, error: String(error) });
+      continue;
     }
-  });
+
+    await fetchAndWriteSourcesForUrl(url, options, result);
+  }
+
+  if (options.verbose) {
+    options.logger.info(`Finished crawling ${options.baseUrl}`);
+  }
 }
 
 // Re-export types for convenience

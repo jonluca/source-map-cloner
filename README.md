@@ -117,7 +117,7 @@ async function advancedExample() {
 
 ```typescript
 import { cloneSourceMaps, noopLogger } from "source-map-cloner";
-import { createBrowserFetch } from "source-map-cloner/fetchers";
+import { createBrowserFetch } from "source-map-cloner/fetchers/browser";
 
 async function browserExample() {
   const result = await cloneSourceMaps({

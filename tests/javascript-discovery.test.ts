@@ -154,6 +154,18 @@ test("bundle references cover common framework asset layouts", () => {
   ]);
 });
 
+test("bundle references include commented dynamic imports and minified static imports", () => {
+  const content = `
+    import(/* webpackChunkName: "lazy" */ "./lazy.js");
+    import {value}from"./dependency.js";
+  `;
+
+  assert.deepEqual(extractReferencedJavaScriptUrls(content, "https://example.com/assets/entry.js"), [
+    "https://example.com/assets/lazy.js",
+    "https://example.com/assets/dependency.js",
+  ]);
+});
+
 test("Next bundles resolve static chunk strings from their asset root", () => {
   assert.deepEqual(
     extractReferencedJavaScriptUrls(
