@@ -28,6 +28,12 @@ test("the final sourceMappingURL wins when comments share a line", () => {
   );
 });
 
+test("the final sourceMappingURL comment wins when comments share a minified line", () => {
+  const code = "void 0;/*# sourceMappingURL=old.map *//*# sourceMappingURL=final.map */";
+
+  assert.equal(getSourceMappingURL(code).sourceMappingURL, "final.map");
+});
+
 test("sourceMappingURL is recognized in multiline block comments", () => {
   const code = "/*\n# sourceMappingURL=app.js.map\n*/";
   assert.equal(getSourceMappingURL(code).sourceMappingURL, "app.js.map");

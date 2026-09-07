@@ -256,6 +256,21 @@ test("bundle references include minified side-effect imports", () => {
   );
 });
 
+test("dynamic imports allow comments before the module specifier", () => {
+  const content = `
+    import(/* webpackChunkName: "lazy" */ "./lazy.js");
+    import(
+      // Keep this chunk separate.
+      "./separate.mjs"
+    );
+  `;
+
+  assert.deepEqual(extractReferencedJavaScriptUrls(content, "https://example.com/assets/entry.js"), [
+    "https://example.com/assets/lazy.js",
+    "https://example.com/assets/separate.mjs",
+  ]);
+});
+
 test("Next bundles resolve static chunk strings from their asset root", () => {
   assert.deepEqual(
     extractReferencedJavaScriptUrls(
