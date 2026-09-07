@@ -3,6 +3,7 @@ import test from "node:test";
 import type { FetchFunction, Logger, SourceMapClonerOptions } from "../src/core/types.js";
 import {
   discoverJavaScriptFiles,
+  extractLinkUrlsFromHtml,
   extractJsFromBuildManifest,
   extractReferencedJavaScriptUrls,
   extractJsUrlsFromHtml,
@@ -46,6 +47,61 @@ test("HTML discovery honors base elements and script URLs without extensions", (
   assert.deepEqual(urls, ["https://cdn.example.com/assets/entry"]);
 });
 
+test("HTML discovery parses page scripts without executing them", () => {
+  const urls = extractJsUrlsFromHtml(
+    `<script type="module" src="/original.js"></script>
+     <script>document.querySelector('script[src]').remove();</script>`,
+    "https://example.com/page",
+    options(async () => {
+      throw new Error("not used");
+    }),
+  );
+
+  assert.deepEqual(urls, ["https://example.com/original.js"]);
+});
+
+test("HTML discovery includes module preloads and case-insensitive JavaScript extensions", () => {
+  const urls = extractJsUrlsFromHtml(
+    `<link rel="modulepreload" href="./entry.mjs?v=2">
+     <link rel="preload" as="script" href="./legacy.cjs">
+     <link href="./APP.JS">
+     <link rel="stylesheet" href="./styles.css">`,
+    "https://example.com/assets/page",
+    options(async () => {
+      throw new Error("not used");
+    }),
+  );
+
+  assert.deepEqual(urls, [
+    "https://example.com/assets/entry.mjs?v=2",
+    "https://example.com/assets/legacy.cjs",
+    "https://example.com/assets/APP.JS",
+  ]);
+});
+
+test("link extraction resolves crawl targets against the document base", () => {
+  assert.deepEqual(
+    extractLinkUrlsFromHtml(
+      '<base href="/docs/"><a href="guide">Guide</a><a href="../about">About</a>',
+      "https://example.com/start",
+    ),
+    ["https://example.com/docs/guide", "https://example.com/about"],
+  );
+});
+
+test("HTML text discovery uses the document base without adding incorrect asset URLs", async () => {
+  const urls = await discoverJavaScriptFiles(
+    "https://example.com/page",
+    options(async (url) => ({
+      body: '<base href="https://cdn.example.com/site/"><script src="assets/app.js"></script>',
+      statusCode: 200,
+      requestUrl: url,
+    })),
+  );
+
+  assert.deepEqual(urls, ["https://cdn.example.com/site/assets/app.js"]);
+});
+
 test("document redirects become the base for relative JavaScript URLs", async () => {
   const urls = await discoverJavaScriptFiles(
     "https://example.com/start",
@@ -57,6 +113,33 @@ test("document redirects become the base for relative JavaScript URLs", async ()
   );
 
   assert.deepEqual(urls, ["https://example.com/redirected/page/chunks/app.js"]);
+});
+
+test("discovery rejects unsuccessful page responses from custom fetchers", async () => {
+  await assert.rejects(
+    discoverJavaScriptFiles(
+      "https://example.com/missing",
+      options(async (url) => ({
+        body: '<script src="/error-page.js"></script>',
+        statusCode: 404,
+        requestUrl: url,
+      })),
+    ),
+    /HTTP 404 error fetching https:\/\/example\.com\/missing/,
+  );
+});
+
+test("build manifest discovery ignores unsuccessful custom fetch responses", async () => {
+  const urls = await extractJsFromBuildManifest(
+    "https://example.com/_next/static/id/_buildManifest.js",
+    options(async (url) => ({
+      body: 'self.__BUILD_MANIFEST = { "/": ["static/chunks/error-page.js"] };',
+      statusCode: 404,
+      requestUrl: url,
+    })),
+  );
+
+  assert.deepEqual(urls, []);
 });
 
 test("build manifests are traversed recursively and preserve module query strings", async () => {
@@ -164,6 +247,13 @@ test("bundle references include commented dynamic imports and minified static im
     "https://example.com/assets/lazy.js",
     "https://example.com/assets/dependency.js",
   ]);
+});
+
+test("bundle references include minified side-effect imports", () => {
+  assert.deepEqual(
+    extractReferencedJavaScriptUrls("import\"./setup.js\";import'./polyfills.mjs';", "https://example.com/entry.js"),
+    ["https://example.com/setup.js", "https://example.com/polyfills.mjs"],
+  );
 });
 
 test("Next bundles resolve static chunk strings from their asset root", () => {

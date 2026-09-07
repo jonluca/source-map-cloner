@@ -75,6 +75,9 @@ export default function Home() {
       return;
     }
 
+    setSelectedFile(null);
+    setSearchQuery("");
+    setIsFullscreen(false);
     mutate({ url });
   };
 
@@ -108,7 +111,9 @@ export default function Home() {
     const downloadUrl = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = downloadUrl;
-    link.download = `source-map-${new URL(url).hostname}-${Date.now()}.zip`;
+    const sourceUrl = result.stats.urls[0];
+    const hostname = sourceUrl ? new URL(sourceUrl).hostname : "sources";
+    link.download = `source-map-${hostname}-${Date.now()}.zip`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -300,12 +305,27 @@ export default function Home() {
 
                   {result.errors.length > 0 && (
                     <div className="mt-6">
-                      <h3 className="mb-3 text-lg font-semibold text-yellow-300">Warnings:</h3>
+                      <h3 className="mb-3 text-lg font-semibold text-yellow-300">Errors:</h3>
                       <div className="rounded-lg border border-yellow-500 bg-yellow-900/20 p-4">
                         <ul className="space-y-1 text-sm text-yellow-300">
                           {result.errors.map((sourceError, index) => (
                             <li key={index}>
                               {sourceError.file ?? sourceError.url}: {sourceError.error}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+                  {result.warnings.length > 0 && (
+                    <div className="mt-6">
+                      <h3 className="mb-3 text-lg font-semibold text-yellow-300">Warnings:</h3>
+                      <div className="rounded-lg border border-yellow-500 bg-yellow-900/20 p-4">
+                        <ul className="space-y-1 text-sm text-yellow-300">
+                          {result.warnings.map((warning, index) => (
+                            <li key={index}>
+                              {warning.file || warning.url ? `${warning.file ?? warning.url}: ` : ""}
+                              {warning.warning}
                             </li>
                           ))}
                         </ul>

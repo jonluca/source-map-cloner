@@ -65,6 +65,7 @@ export type FetchFunction = (
 ) => Promise<{
   body: string;
   statusCode: number;
+  /** Final response URL after redirects, used to resolve relative references. */
   requestUrl: string;
 }>;
 

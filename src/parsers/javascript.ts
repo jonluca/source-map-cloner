@@ -1,6 +1,7 @@
 import jsdom from "jsdom";
 import { VM } from "vm2";
 import type { SourceMapClonerOptions } from "../core/types.js";
+import { HTTPError } from "../utils/errors.js";
 
 const { JSDOM } = jsdom;
 
@@ -10,7 +11,7 @@ const ESCAPED_JS_FILE_REGEX = /\\["']([^"'<>\\]+?\.(?:js|mjs|cjs)(?:[?#][^"'<>\\
 const DYNAMIC_IMPORT_REGEX =
   /\bimport\s*\(\s*(?:(?:\/\*[\s\S]*?\*\/|\/\/[^\r\n]*(?:\r?\n|$))\s*)*["']([^"']+\.(?:js|mjs|cjs)(?:[?#][^"']*)?)["']/gi;
 const STATIC_IMPORT_REGEX =
-  /\b(?:import|export)\s+(?:[^"']*?\bfrom\s*)?["']([^"']+\.(?:js|mjs|cjs)(?:[?#][^"']*)?)["']/gi;
+  /\b(?:import|export)\b\s*(?:[^"']*?\bfrom\s*)?["']([^"']+\.(?:js|mjs|cjs)(?:[?#][^"']*)?)["']/gi;
 const URL_CONSTRUCTOR_REGEX = /\bnew\s+URL\s*\(\s*["']([^"']+\.(?:js|mjs|cjs)(?:[?#][^"']*)?)["']\s*,/gi;
 
 function isJavaScriptUrl(url: string): boolean {
@@ -31,7 +32,17 @@ export function extractJsUrlsFromHtml(
   options: SourceMapClonerOptions,
   protocol = "https:",
 ): string[] {
+  return extractHtmlJavaScriptReferences(html, baseUrl, options, protocol).urls;
+}
+
+function extractHtmlJavaScriptReferences(
+  html: string,
+  baseUrl: string,
+  options: SourceMapClonerOptions,
+  protocol = "https:",
+): { urls: string[]; documentBaseUrl: string } {
   const urls: string[] = [];
+  let documentBaseUrl = baseUrl;
 
   try {
     const virtualConsole = new jsdom.VirtualConsole();
@@ -39,68 +50,65 @@ export function extractJsUrlsFromHtml(
     virtualConsole.on("error", () => undefined);
     virtualConsole.on("warn", () => undefined);
 
+    // Discovery only needs the parsed document. Running page scripts can
+    // mutate its assets, and loading resources bypasses the configured fetcher.
     const dom = new JSDOM(html, {
-      runScripts: "dangerously",
-      resources: { userAgent: "Mozilla/5.0" },
       url: baseUrl,
-      pretendToBeVisual: true,
       virtualConsole,
     });
 
-    if (!dom?.window?.document) {
-      options.logger.warn("Failed to parse DOM");
-      return urls;
-    }
+    try {
+      documentBaseUrl = dom.window.document.baseURI;
 
-    // Extract from script tags
-    const scripts = dom.window.document.querySelectorAll("script");
-    scripts.forEach((script) => {
-      const src = script.src;
-      if (src) {
-        if (src.startsWith("//")) {
-          urls.push(`${protocol}${src}`);
-        } else {
-          urls.push(src);
-        }
-      }
-    });
-
-    // Extract from link tags with JS files
-    const links = dom.window.document.querySelectorAll("[href]");
-    links.forEach((link) => {
-      const href = "href" in link && (link.href as string);
-      if (href) {
-        try {
-          const url = new URL(href, baseUrl);
-          if (url.pathname.endsWith(".js")) {
-            if (href.startsWith("//")) {
-              urls.push(`${protocol}${href}`);
-            } else {
-              urls.push(href);
-            }
+      // Extract from script tags
+      const scripts = dom.window.document.querySelectorAll("script");
+      scripts.forEach((script) => {
+        const src = script.src;
+        if (src) {
+          if (src.startsWith("//")) {
+            urls.push(`${protocol}${src}`);
+          } else {
+            urls.push(src);
           }
-        } catch {
-          // Invalid URL, skip
         }
-      }
-    });
+      });
 
-    // Clean up DOM
-    dom.window.close();
+      // Extract from link tags with JS files
+      const links = dom.window.document.querySelectorAll("[href]");
+      links.forEach((link) => {
+        const href = link.getAttribute("href");
+        if (href) {
+          try {
+            const url = new URL(href, documentBaseUrl);
+            if (isJavaScriptUrl(url.href)) {
+              urls.push(url.href);
+            }
+          } catch {
+            // Invalid URL, skip
+          }
+        }
+      });
+    } finally {
+      dom.window.close();
+    }
   } catch (error) {
     options.logger.error(`Error parsing HTML DOM: ${error}`);
   }
 
-  return urls;
+  return { urls, documentBaseUrl };
 }
 
-/** Extract raw anchor targets while retaining the document's base URL semantics. */
+/** Resolve anchor targets while retaining the document's base URL semantics. */
 export function extractLinkUrlsFromHtml(html: string, pageUrl: string): string[] {
   const dom = new JSDOM(html, { url: pageUrl });
   try {
     return [...dom.window.document.querySelectorAll("a[href]")].flatMap((anchor) => {
       const href = anchor.getAttribute("href");
-      return href ? [href] : [];
+      try {
+        return href ? [new URL(href, dom.window.document.baseURI).href] : [];
+      } catch {
+        return [];
+      }
     });
   } finally {
     dom.window.close();
@@ -313,6 +321,9 @@ export async function extractJsFromBuildManifest(
     const resp = await options.fetch(newUrl.href, {
       headers: options.headers || {},
     });
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw new HTTPError(resp.requestUrl, resp.statusCode);
+    }
 
     const { body: data, requestUrl } = resp;
     const files = extractJsPathsFromText(data);
@@ -369,25 +380,28 @@ export async function discoverJavaScriptFiles(url: string, options: SourceMapClo
     const resp = await options.fetch(url, {
       headers: options.headers || {},
     });
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw new HTTPError(resp.requestUrl, resp.statusCode);
+    }
 
     const { body: html, requestUrl } = resp;
     const documentUrl = new URL(requestUrl, url).href;
     const protocol = new URL(documentUrl).protocol || "https:";
 
     // Extract JS URLs from HTML
-    const htmlUrls = extractJsUrlsFromHtml(html, documentUrl, options, protocol);
+    const { urls: htmlUrls, documentBaseUrl } = extractHtmlJavaScriptReferences(html, documentUrl, options, protocol);
     jsFiles.push(...htmlUrls);
 
     // Extract JS URLs using regex. App Router Flight payloads use paths such
     // as "static/chunks/app/page.js", relative to the _next asset root rather
     // than to the current document.
-    const textUrls = extractReferencedJavaScriptUrlsWithBase(html, documentUrl, findNextAssetBase(htmlUrls));
+    const textUrls = extractReferencedJavaScriptUrlsWithBase(html, documentBaseUrl, findNextAssetBase(htmlUrls));
     jsFiles.push(...textUrls);
 
     // Convert to absolute URLs
     const absoluteUrls = jsFiles.map((jsUrl) => {
       try {
-        return new URL(jsUrl, documentUrl).href;
+        return new URL(jsUrl, documentBaseUrl).href;
       } catch {
         return jsUrl;
       }

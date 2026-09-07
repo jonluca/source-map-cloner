@@ -66,6 +66,16 @@ test("missing source fetching can be disabled", async () => {
   assert.deepEqual(files, []);
 });
 
+test("missing sources do not use HTTP error pages as source content", async () => {
+  const files = await processSourceMap(
+    { version: 3, sources: ["src/app.ts"], names: [], mappings: "" },
+    "https://example.com/app.js.map",
+    options(async (url) => ({ body: "<html>Not found</html>", statusCode: 404, requestUrl: url })),
+  );
+
+  assert.deepEqual(files, []);
+});
+
 test("indexed source maps retain source content from every section", async () => {
   const parsed = await parseSourceMap(
     {
@@ -86,4 +96,60 @@ test("indexed source maps retain source content from every section", async () =>
 
   assert.deepEqual(parsed.sources, ["src/first.ts", "src/second.ts"]);
   assert.deepEqual(parsed.sourcesContent, ["first", "second"]);
+});
+
+test("indexed source maps preserve duplicate names, empty content, and missing content by position", async () => {
+  const parsed = await parseSourceMap(
+    {
+      version: 3,
+      sections: [
+        {
+          offset: { line: 0, column: 0 },
+          map: { ...minimalMap, sourcesContent: ["first"] },
+        },
+        {
+          offset: { line: 1, column: 0 },
+          map: {
+            version: 3,
+            sections: [
+              {
+                offset: { line: 0, column: 0 },
+                map: { ...minimalMap, sourcesContent: ["second"] },
+              },
+              {
+                offset: { line: 1, column: 0 },
+                map: { ...minimalMap, sources: ["src/empty.ts"], sourcesContent: [""] },
+              },
+              {
+                offset: { line: 2, column: 0 },
+                map: { ...minimalMap, sourcesContent: [null] },
+              },
+            ],
+          },
+        },
+      ],
+    },
+    "https://example.com/app.js.map",
+  );
+
+  assert.deepEqual(parsed.sources, ["src/app.ts", "src/app.ts", "src/empty.ts", "src/app.ts"]);
+  assert.deepEqual(parsed.sourcesContent, ["first", "second", "", null]);
+});
+
+test("empty source content in an indexed map is retained without fetching", async () => {
+  let requests = 0;
+  const files = await processSourceMap(
+    {
+      version: 3,
+      sections: [{ offset: { line: 0, column: 0 }, map: { ...minimalMap, sourcesContent: [""] } }],
+    },
+    "https://example.com/app.js.map",
+    options(async (url) => {
+      requests += 1;
+      return { body: "unexpected", statusCode: 200, requestUrl: url };
+    }),
+  );
+
+  assert.deepEqual(files, [{ path: "src/app.ts", content: "" }]);
+  assert.equal(requests, 0);
 });

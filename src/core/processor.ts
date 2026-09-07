@@ -8,7 +8,7 @@ import {
 } from "../parsers/javascript.js";
 import { getSourceMappingURL } from "./source-map-utils.js";
 import { fetchFromURL } from "../fetchers/utils.js";
-import { InvalidURLError } from "../utils/errors.js";
+import { HTTPError, InvalidURLError } from "../utils/errors.js";
 import { noopLogger } from "../utils/default-logger.js";
 import type { CloneOptions, CloneResult, SourceMapClonerOptions, SourceFile } from "./types.js";
 import { createBrowserFetch } from "../fetchers/browser.js";
@@ -27,7 +27,10 @@ interface ProcessedJavaScriptFile {
 
 async function fetchAndParseJsFile(url: string, options: SourceMapClonerOptions): Promise<ProcessedJavaScriptFile> {
   const { verbose, headers, fetch } = options;
-  const { body: data, requestUrl } = await fetch(url, { headers });
+  const { body: data, requestUrl, statusCode } = await fetch(url, { headers });
+  if (statusCode < 200 || statusCode >= 300) {
+    throw new HTTPError(url, statusCode);
+  }
   const bundleUrl = new URL(requestUrl, url).href;
   const { sourceMappingURL } = getSourceMappingURL(data);
   const referencedScripts = options.discoverReferencedScripts
@@ -49,7 +52,7 @@ async function fetchAndParseJsFile(url: string, options: SourceMapClonerOptions)
 
   for (const sourceMapUrl of urlsToCheck) {
     let canonicalUrl = sourceMapUrl;
-    if (!sourceMapUrl.startsWith("data:")) {
+    if (!/^data:/i.test(sourceMapUrl)) {
       try {
         canonicalUrl = new URL(sourceMapUrl, bundleUrl).href;
       } catch {
@@ -428,6 +431,9 @@ async function crawlAndProcess(urls: string[], options: SourceMapClonerOptions, 
     const url = pendingUrls.shift()!;
     try {
       const response = await options.fetch(url, { headers: options.headers ?? {} });
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw new HTTPError(url, response.statusCode);
+      }
       const pageUrl = new URL(response.requestUrl, url).href;
       const discoveredUrls = getCrawlUrls(extractLinkUrlsFromHtml(response.body, pageUrl), pageUrl, allowedOrigins);
       for (const discoveredUrl of discoveredUrls) {

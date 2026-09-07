@@ -3,6 +3,7 @@ import parseDataURL from "../parsers/data-url.js";
 import * as iconv from "iconv-lite";
 const { decode } = iconv;
 import labelsToNames from "../parsers/label-mapper.js";
+import { HTTPError } from "../utils/errors.js";
 
 /**
  * Fetch content from a URL (including data URLs)
@@ -14,7 +15,7 @@ export async function fetchFromURL(
   fetch: FetchFunction,
 ): Promise<{ sourceContent: string; sourceUrl: string }> {
   // Handle data URLs
-  if (sourceMapUrl.startsWith("data:")) {
+  if (/^data:/i.test(sourceMapUrl)) {
     const dataURL = parseDataURL(sourceMapUrl);
     if (dataURL) {
       // JSON text SHALL be encoded in Unicode. The default encoding is UTF-8.
@@ -28,6 +29,9 @@ export async function fetchFromURL(
   // Handle regular URLs
   const absoluteUrl = new URL(sourceMapUrl, baseUrl).href;
   const response = await fetch(absoluteUrl, { headers });
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw new HTTPError(absoluteUrl, response.statusCode);
+  }
   return { sourceContent: response.body, sourceUrl: response.requestUrl || absoluteUrl };
 }
 

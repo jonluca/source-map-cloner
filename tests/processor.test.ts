@@ -11,6 +11,16 @@ const logger: Logger = {
 
 const successfulFetch: FetchFunction = async (url) => ({ body: "", statusCode: 200, requestUrl: url });
 
+test("failed JavaScript HTTP responses from custom fetchers are reported", async () => {
+  const result = await cloneSourceMaps({
+    urls: "https://example.com/app.js",
+    fetch: async (url) => ({ body: "Unavailable", statusCode: 403, requestUrl: url }),
+  });
+  assert.equal(result.errors.length, 1);
+  assert.match(result.errors[0]?.error ?? "", /HTTP 403/);
+  assert.equal(result.stats.sourceMapsFound, 0);
+});
+
 const createChunkGraphFetch =
   (requests: string[]): FetchFunction =>
   async (url) => {

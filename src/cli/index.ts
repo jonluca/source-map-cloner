@@ -1,7 +1,5 @@
 #! /usr/bin/env node
 import path from "path";
-import fs from "fs/promises";
-import { mkdirp } from "mkdirp";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { cloneSourceMaps, type CloneOptions, type CloneResult } from "../core/processor.js";
@@ -9,6 +7,7 @@ import { createNodeFetch } from "../fetchers/index.js";
 import { InvalidURLError, formatError } from "../utils/errors.js";
 import { createConsoleLogger } from "../utils/default-logger.js";
 import { getUtf8ByteLength } from "../utils/bytes.js";
+import { writeSourceFile } from "./write-source-file.js";
 
 const logger = createConsoleLogger();
 // Setup global error handlers
@@ -182,13 +181,14 @@ if (args.verbose) {
 /**
  * Write files from the clone result to disk
  */
-async function writeFilesToDisk(result: CloneResult, targetDir: string, dryRun: boolean): Promise<void> {
+async function writeFilesToDisk(result: CloneResult, targetDir: string, dryRun: boolean): Promise<number> {
   if (dryRun) {
     logger.info("\n=== DRY RUN MODE - No files will be written ===\n");
   }
 
   let filesWritten = 0;
   let bytesWritten = 0;
+  let writeFailures = 0;
 
   for (const [filePath, content] of result.files) {
     const fullPath = path.join(targetDir, filePath);
@@ -199,12 +199,7 @@ async function writeFilesToDisk(result: CloneResult, targetDir: string, dryRun: 
       bytesWritten += getUtf8ByteLength(content);
     } else {
       try {
-        // Create directory if needed
-        const dir = path.dirname(fullPath);
-        await mkdirp(dir);
-
-        // Write file
-        await fs.writeFile(fullPath, content, "utf-8");
+        await writeSourceFile(targetDir, filePath, content);
 
         if (args.verbose) {
           logger.info(`Wrote: ${fullPath} (${getUtf8ByteLength(content)} bytes)`);
@@ -213,6 +208,7 @@ async function writeFilesToDisk(result: CloneResult, targetDir: string, dryRun: 
         filesWritten++;
         bytesWritten += getUtf8ByteLength(content);
       } catch (error) {
+        writeFailures++;
         logger.error(`Failed to write ${fullPath}: ${error}`);
       }
     }
@@ -223,6 +219,7 @@ async function writeFilesToDisk(result: CloneResult, targetDir: string, dryRun: 
   } else {
     logger.info(`✓ Wrote ${filesWritten} files (${formatBytes(bytesWritten)})`);
   }
+  return writeFailures;
 }
 
 /**
@@ -285,16 +282,16 @@ async function main() {
     displayErrors(result);
 
     // Write files to disk (or show what would be written)
-    await writeFilesToDisk(result, outputDir, args.dryRun);
+    const writeFailures = await writeFilesToDisk(result, outputDir, args.dryRun);
 
     const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
     logger.info(`✓ Total execution time: ${totalDuration}s`);
 
-    if (!args.dryRun) {
+    if (!args.dryRun && writeFailures === 0) {
       logger.info(`✓ Output saved to: ${outputDir}`);
     }
 
-    process.exit(result.errors.length > 0 ? 1 : 0);
+    process.exit(result.errors.length > 0 || writeFailures > 0 ? 1 : 0);
   } catch (error) {
     if (error instanceof InvalidURLError) {
       logger.error(`Invalid URL: ${error.message}`);

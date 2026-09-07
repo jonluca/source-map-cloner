@@ -21,11 +21,34 @@ test("the final sourceMappingURL comment wins across line and block forms", () =
   assert.equal(getSourceMappingURL(code).sourceMappingURL, "final.js.map");
 });
 
-test("sourceMappingURL parsing tolerates legacy @ comments and encoded spaces", () => {
+test("the final sourceMappingURL wins when comments share a line", () => {
+  assert.equal(
+    getSourceMappingURL("/*# sourceMappingURL=old.js.map */ /*# sourceMappingURL=final.js.map */").sourceMappingURL,
+    "final.js.map",
+  );
+});
+
+test("sourceMappingURL is recognized in multiline block comments", () => {
+  const code = "/*\n# sourceMappingURL=app.js.map\n*/";
+  assert.equal(getSourceMappingURL(code).sourceMappingURL, "app.js.map");
+});
+
+test("sourceMappingURL parsing preserves encoded spaces in legacy @ comments", () => {
   assert.equal(
     getSourceMappingURL("//@ sourceMappingURL=maps/app%20bundle.map").sourceMappingURL,
-    "maps/app bundle.map",
+    "maps/app%20bundle.map",
   );
+});
+
+test("external source map requests preserve literal percent sequences in their URL", async () => {
+  const { sourceMappingURL } = getSourceMappingURL("//# sourceMappingURL=maps/app%2520bundle.map");
+  let requested: string | undefined;
+  await fetchFromURL(sourceMappingURL!, "https://example.com/app.js", {}, async (url) => {
+    requested = url;
+    return { body: "{}", statusCode: 200, requestUrl: url };
+  });
+
+  assert.equal(requested, "https://example.com/maps/app%2520bundle.map");
 });
 
 test("percent-encoded data URLs honor their declared charset", async () => {

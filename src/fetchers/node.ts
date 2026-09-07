@@ -25,7 +25,7 @@ export function createNodeFetch(defaultOptions: NodeFetchOptions = {}): FetchFun
       return {
         body: response.body,
         statusCode: response.statusCode,
-        requestUrl: response.requestUrl.href,
+        requestUrl: response.url,
       };
     } catch (error: any) {
       throw new HTTPError(url, error.response?.statusCode, {

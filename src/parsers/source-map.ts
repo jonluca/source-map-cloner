@@ -16,18 +16,16 @@ export interface ParsedSourceMap {
   sourcesContent: (string | null)[];
 }
 
-interface RawSourceMapWithContent {
-  sourcesContent?: unknown[];
-}
-
-function getRawSourceContent(rawSourcesContent: unknown[] | undefined, index: number): string | null | undefined {
-  const content = rawSourcesContent?.[index];
-
-  if (typeof content === "string" || content === null) {
-    return content;
+function getRawSourcesContent(rawSourceMap: RawSourceMap | RawIndexMap): (string | null)[] {
+  if ("sections" in rawSourceMap) {
+    return rawSourceMap.sections.flatMap(({ map }) => getRawSourcesContent(map));
   }
 
-  return undefined;
+  const contents = Array.isArray(rawSourceMap.sourcesContent) ? rawSourceMap.sourcesContent : [];
+  return rawSourceMap.sources.map((_, index) => {
+    const content = contents[index];
+    return typeof content === "string" ? content : null;
+  });
 }
 
 function parseSourceMapJson(value: string): object {
@@ -46,25 +44,18 @@ export async function parseSourceMap(sourceMapData: string | object, sourceUrl: 
   let consumer: BasicSourceMapConsumer | IndexedSourceMapConsumer | undefined;
 
   try {
-    const rawSourceMap = typeof sourceMapData === "string" ? parseSourceMapJson(sourceMapData) : sourceMapData;
-    const rawSourcesContent = Array.isArray((rawSourceMap as RawSourceMapWithContent).sourcesContent)
-      ? (rawSourceMap as RawSourceMapWithContent).sourcesContent
-      : undefined;
+    const rawSourceMap = (typeof sourceMapData === "string" ? parseSourceMapJson(sourceMapData) : sourceMapData) as
+      | RawSourceMap
+      | RawIndexMap;
 
-    consumer = await new SourceMapConsumer(rawSourceMap as RawSourceMap | RawIndexMap);
+    consumer = await new SourceMapConsumer(rawSourceMap);
     const sources = consumer.sources || [];
 
     return {
       sources,
-      sourcesContent: sources.map((source, index) => {
-        const rawContent = getRawSourceContent(rawSourcesContent, index);
-        if (rawContent !== undefined) {
-          return rawContent;
-        }
-
-        const content = consumer?.sourceContentFor(source, true);
-        return typeof content === "string" ? content : null;
-      }),
+      // Keep content aligned by source index, including across nested sections.
+      // Looking it up by name loses duplicate entries and empty indexed sources.
+      sourcesContent: getRawSourcesContent(rawSourceMap),
     };
   } catch (error) {
     throw new SourceMapParseError(sourceUrl, error);
@@ -109,6 +100,9 @@ async function fetchMissingSourceContent(
 
       try {
         const response = await options.fetch(sourceUrl, { headers: options.headers ?? {} });
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          throw new Error(`HTTP ${response.statusCode}`);
+        }
         sourcesContent[index] = response.body;
 
         if (options.verbose) {
