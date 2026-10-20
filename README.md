@@ -312,6 +312,24 @@ The optional live suite checks versioned CDN bundles for exact source reconcilia
 pnpm test:live
 ```
 
+### Top-Domain Survey
+
+The optional survey uses the latest [Tranco](https://tranco-list.eu/) ranking and tests its first 1,000 domains.
+It downloads only those 1,000 rows, validates their ranks and domain names, and saves the list ID and download
+URL in `results/run-*/domain-list.json` so the input can be reproduced. Each run retrieves the current list;
+legacy Alexa/OpenDNS caches are no longer used. Invalid responses stop the survey before any sites are visited.
+
+```bash
+# Check the current domain list without visiting its websites or writing survey results
+pnpm exec tsx scripts/test-top-domain.ts --list-only
+
+# Run the survey against the 1,000 listed domains
+pnpm exec tsx scripts/test-top-domain.ts
+```
+
+Ranking attribution: Le Pochat et al., _Tranco: A Research-Oriented Top Sites Ranking Hardened Against
+Manipulation_, NDSS 2019. See [Tranco's attribution and underlying data sources](https://tranco-list.eu/).
+
 ### Running in Development
 
 ```bash

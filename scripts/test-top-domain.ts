@@ -3,12 +3,11 @@
 import * as fs from "fs";
 import * as path from "path";
 import pMap from "p-map";
-import { parse } from "csv-parse/sync";
-import { execSync } from "child_process";
 import { mkdirp } from "mkdirp";
-import { cloneSourceMaps, type CloneOptions } from "../src/core/processor";
-import { createNodeFetch } from "../src/fetchers";
-import { createConsoleLogger } from "../src/utils/default-logger";
+import { cloneSourceMaps, type CloneOptions } from "../src/core/processor.js";
+import { createNodeFetch } from "../src/fetchers/index.js";
+import { createConsoleLogger } from "../src/utils/default-logger.js";
+import { fetchTopDomains, type TopDomainList } from "./top-domains.js";
 
 interface DomainResult {
   domain: string;
@@ -27,24 +26,36 @@ class TopDomainTester {
   private startTime: number = Date.now();
   private logger = createConsoleLogger();
 
-  constructor(private domains: string[]) {
+  constructor(private domainList: TopDomainList) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     this.resultsDir = path.join("results", `run-${timestamp}`);
     this.outputDir = path.join(this.resultsDir, "source-maps");
 
     fs.mkdirSync(this.resultsDir, { recursive: true });
     fs.mkdirSync(this.outputDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(this.resultsDir, "domain-list.json"),
+      JSON.stringify(
+        {
+          provider: "Tranco",
+          listId: domainList.listId,
+          sourceUrl: domainList.sourceUrl,
+          domainCount: domainList.domains.length,
+          retrievedAt: new Date().toISOString(),
+        },
+        null,
+        2,
+      ),
+    );
   }
 
   async run() {
     const CONCURRENCY = 5;
-    const LIMIT = 1000; // Test first 1000 domains
+    const domainsToTest = this.domainList.domains;
 
-    console.log(`Starting test with ${Math.min(this.domains.length, LIMIT)} domains`);
+    console.log(`Starting test with ${domainsToTest.length} domains`);
     console.log(`Concurrency: ${CONCURRENCY}`);
     console.log(`Output directory: ${this.resultsDir}`);
-
-    const domainsToTest = this.domains.slice(0, LIMIT);
 
     await pMap(
       domainsToTest,
@@ -218,50 +229,19 @@ class TopDomainTester {
   }
 }
 
-async function fetchTopDomains(): Promise<string[]> {
-  const listPath = path.join(__dirname, "top-1m.csv");
-
-  if (fs.existsSync(listPath)) {
-    console.log("Using cached domain list");
-    const content = fs.readFileSync(listPath, "utf-8");
-    const records = parse(content, { columns: false });
-    return records.map((r: string[]) => r[1]);
-  }
-
-  console.log("Downloading Alexa Top 1M domains...");
-  try {
-    execSync(
-      `curl -o ${listPath}.zip https://s3.amazonaws.com/alexa-static/top-1m.csv.zip && unzip -o ${listPath}.zip -d ${__dirname} && rm ${listPath}.zip`,
-      { stdio: "inherit" },
-    );
-  } catch {
-    console.error("Failed to download Alexa list, trying alternative source...");
-    // Try alternative source or use a fallback list
-    execSync(
-      `curl -o ${listPath} https://raw.githubusercontent.com/opendns/public-domain-lists/master/opendns-top-domains.txt`,
-      { stdio: "inherit" },
-    );
-    const content = fs.readFileSync(listPath, "utf-8");
-    return content
-      .split("\n")
-      .map((d) => d.trim())
-      .filter((d) => d.length > 0);
-  }
-
-  const content = fs.readFileSync(listPath, "utf-8");
-  const records = parse(content, { columns: false });
-  return records.map((r: string[]) => r[1]);
-}
-
 async function main() {
   try {
     console.log("Source Map Cloner - Top Domain Tester");
     console.log("=====================================\n");
 
-    const domains = await fetchTopDomains();
-    console.log(`Loaded ${domains.length} domains\n`);
+    const domainList = await fetchTopDomains();
+    console.log(`Loaded ${domainList.domains.length} domains from Tranco list ${domainList.listId}`);
+    console.log(`Source: ${domainList.sourceUrl}\n`);
+    if (process.argv.includes("--list-only")) {
+      return;
+    }
 
-    const tester = new TopDomainTester(domains);
+    const tester = new TopDomainTester(domainList);
     await tester.run();
 
     console.log("\n✅ Test completed successfully!");
