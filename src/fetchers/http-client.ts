@@ -1,6 +1,5 @@
 import { CookieJar } from "tough-cookie";
 import type { AgentOptions } from "http";
-import https from "https";
 import * as http from "node:http";
 import type { Got } from "got";
 import got from "got";
@@ -38,23 +37,22 @@ const agentOptions: AgentOptions = {
   timeout: HTTP_TIMEOUT,
 } as const;
 
-const httpsAgent = new https.Agent({
-  ...agentOptions,
-  rejectUnauthorized: false,
-  ciphers: TLS_CIPHERS,
-});
-
 const httpAgent = new http.Agent(agentOptions);
 
 export const agent = {
   http: httpAgent,
-  https: httpsAgent,
 };
 
 // Create a configured Got instance
 export const gotClient: Got = got.extend({
   agent,
   http2: true,
+  // Got 16 skips HTTP/2 when a custom HTTPS agent is supplied.
+  dnsLookupIpVersion: 4,
+  https: {
+    rejectUnauthorized: false,
+    ciphers: TLS_CIPHERS,
+  },
   cookieJar,
   timeout: {
     request: HTTP_TIMEOUT,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 interface TreeNode {
   name: string;
@@ -41,8 +41,23 @@ function expandAll(node: TreeNode, path = ""): string[] {
 }
 
 export function FileTree({ data, onFileSelect, searchQuery = "", isFullscreen = false }: FileTreeProps) {
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const [expansion, setExpansion] = useState(() => ({
+    data,
+    searchQuery,
+    paths: new Set(searchQuery ? data.children?.flatMap((child) => expandAll(child)) : []),
+  }));
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+
+  // Expand a new search before rendering, while preserving manual toggles between searches.
+  if (expansion.data !== data || expansion.searchQuery !== searchQuery) {
+    setExpansion({
+      data,
+      searchQuery,
+      paths: searchQuery ? new Set(data.children?.flatMap((child) => expandAll(child))) : expansion.paths,
+    });
+  }
+
+  const expandedNodes = expansion.paths;
 
   const toggleNode = (path: string) => {
     const newExpanded = new Set(expandedNodes);
@@ -51,7 +66,7 @@ export function FileTree({ data, onFileSelect, searchQuery = "", isFullscreen = 
     } else {
       newExpanded.add(path);
     }
-    setExpandedNodes(newExpanded);
+    setExpansion({ ...expansion, paths: newExpanded });
   };
 
   const handleFileClick = (path: string) => {
@@ -91,14 +106,6 @@ export function FileTree({ data, onFileSelect, searchQuery = "", isFullscreen = 
 
     return null;
   };
-
-  // Auto-expand all nodes when searching
-  useEffect(() => {
-    if (searchQuery) {
-      const allPaths = data.children ? data.children.flatMap((child) => expandAll(child)) : [];
-      setExpandedNodes(new Set(allPaths));
-    }
-  }, [searchQuery, data]);
 
   const renderNode = (node: TreeNode, path = "", depth = 0) => {
     // Apply filter

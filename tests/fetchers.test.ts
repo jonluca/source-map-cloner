@@ -1,10 +1,53 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
-import type { AddressInfo } from "node:net";
+import { createSecureServer, type ServerHttp2Session } from "node:http2";
+import type { AddressInfo, Socket } from "node:net";
 import test from "node:test";
 import { cloneSourceMaps } from "../src/core/processor.js";
 import { createNodeFetch } from "../src/fetchers/node.js";
 import { fetchFromURL } from "../src/fetchers/utils.js";
+
+test("the configured Node fetcher negotiates HTTP/2 over IPv4 with its TLS settings", async (t) => {
+  // Public, self-signed fixtures generated solely for this local test; never use them in production.
+  const server = createSecureServer(
+    {
+      key: readFileSync(new URL("./fixtures/localhost-test-key.pem", import.meta.url)),
+      cert: readFileSync(new URL("./fixtures/localhost-test-cert.pem", import.meta.url)),
+      allowHTTP1: true,
+    },
+    (request, response) => {
+      response.end(JSON.stringify({ protocol: request.httpVersion, addressFamily: request.socket.remoteFamily }));
+    },
+  );
+  const sessions = new Set<ServerHttp2Session>();
+  const sockets = new Set<Socket>();
+  server.on("session", (session) => {
+    sessions.add(session);
+    session.once("close", () => sessions.delete(session));
+  });
+  server.on("connection", (socket) => {
+    sockets.add(socket);
+    socket.once("close", () => sockets.delete(socket));
+  });
+  t.after(() => {
+    const closed = new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+    for (const session of sessions) {
+      session.destroy();
+    }
+    for (const socket of sockets) {
+      socket.destroy();
+    }
+    return closed;
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const url = `https://localhost:${(server.address() as AddressInfo).port}/protocol`;
+
+  const response = await createNodeFetch()(url);
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.requestUrl, url);
+  assert.deepEqual(JSON.parse(response.body), { protocol: "2.0", addressFamily: "IPv4" });
+});
 
 test("the Node fetcher resolves pages, bundles, and missing sources after redirects", async (t) => {
   const requests: string[] = [];
