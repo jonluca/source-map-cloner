@@ -224,18 +224,17 @@ async function fetchTopDomains(): Promise<string[]> {
   if (fs.existsSync(listPath)) {
     console.log("Using cached domain list");
     const content = fs.readFileSync(listPath, "utf-8");
-    const records = parse(content, { columns: false });
+    const records = parse(content, { columns: false, from_line: 2 });
     return records.map((r: string[]) => r[1]);
   }
 
-  console.log("Downloading Alexa Top 1M domains...");
+  // NetAPI Top 1M: rank,domain CSV with one header line (NetAPI_Rank,Domain), rebuilt daily, CC BY 4.0.
+  // The Alexa Top 1M it replaces was retired in 2022 and the old S3 address serves a placeholder now.
+  console.log("Downloading NetAPI Top 1M domains...");
   try {
-    execSync(
-      `curl -o ${listPath}.zip https://s3.amazonaws.com/alexa-static/top-1m.csv.zip && unzip -o ${listPath}.zip -d ${__dirname} && rm ${listPath}.zip`,
-      { stdio: "inherit" },
-    );
+    execSync(`curl -fsSL -o ${listPath} https://netapi.com/netapi_top1mln.csv`, { stdio: "inherit" });
   } catch {
-    console.error("Failed to download Alexa list, trying alternative source...");
+    console.error("Failed to download the NetAPI list, trying alternative source...");
     // Try alternative source or use a fallback list
     execSync(
       `curl -o ${listPath} https://raw.githubusercontent.com/opendns/public-domain-lists/master/opendns-top-domains.txt`,
@@ -249,7 +248,7 @@ async function fetchTopDomains(): Promise<string[]> {
   }
 
   const content = fs.readFileSync(listPath, "utf-8");
-  const records = parse(content, { columns: false });
+  const records = parse(content, { columns: false, from_line: 2 });
   return records.map((r: string[]) => r[1]);
 }
 
